@@ -34,7 +34,7 @@ button{cursor:pointer;background:none;border:0;padding:0}
 :focus-visible{outline:2px solid var(--cue);outline-offset:2px}
 svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
-#app{height:100%;padding-top:env(safe-area-inset-top,0px);display:grid;grid-template-columns:272px minmax(0,1fr) 304px;grid-template-rows:50px minmax(0,1fr) 260px;
+#app{height:100%;height:100dvh;padding-top:env(safe-area-inset-top,0px);display:grid;grid-template-columns:272px minmax(0,1fr) 304px;grid-template-rows:50px minmax(0,1fr) 260px;
   grid-template-areas:"top top top" "left stage right" "tl tl tl"}
 
 /* top bar */
@@ -61,7 +61,9 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 #left{grid-area:left;border-right:1px solid var(--line)}
 #right{grid-area:right;border-left:1px solid var(--line)}
 .tabs{display:flex;gap:2px;padding:8px 8px 0;border-bottom:1px solid var(--line);flex:none}
-.tab{padding:8px 9px;border-radius:var(--r) var(--r) 0 0;color:var(--muted);font-weight:700;display:flex;gap:6px;align-items:center}
+.tab{flex:1 1 0;min-width:0;padding:7px 4px 8px;border-radius:var(--r) var(--r) 0 0;color:var(--muted);font-weight:700;font-size:12px;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;white-space:nowrap}
+.tabs .sheet-close{flex:none;align-self:center}
+#right .tab{flex:0 0 auto;flex-direction:row;padding-inline:10px}
 .tab.on{color:var(--fg);box-shadow:inset 0 -2px var(--cue)}
 .sheet-close{display:none;margin-left:auto}
 .pbody{overflow:auto;padding:14px;flex:1;min-height:0}
@@ -83,10 +85,11 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .item .sub{display:flex;justify-content:space-between;gap:6px;font-size:10.5px;color:var(--muted);min-width:0}
 .item .sub span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .reninput{width:100%;min-width:0;height:22px;background:var(--bg);border:1px solid var(--cue);border-radius:4px;padding:0 6px;font-size:12px;font-weight:700;outline:none}
-.binhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.binhead{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px;margin-bottom:8px}
 .binhead .h6{margin:0;white-space:nowrap}
 .sortsel{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);font-weight:600}
-.sortsel select{background:var(--raise);border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-size:12px;font-weight:600}
+.sortsel{min-width:0}
+.sortsel select{max-width:100%;background:var(--raise);border:1px solid var(--line);border-radius:5px;padding:3px 6px;font-size:12px;font-weight:600}
 .wide-btn{width:100%;justify-content:center;margin-bottom:12px;height:30px;font-size:12px}
 .lblin{width:100%;background:var(--raise);border:1px solid var(--line);border-radius:var(--r);padding:6px 9px;font-weight:700}
 .lblin:focus{border-color:var(--cue);outline:none}
@@ -285,36 +288,84 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 #hold{position:fixed;width:2px;height:2px;overflow:hidden;opacity:0;pointer-events:none;left:0;top:0}
 #mbar{display:none}
 
-@media (max-width:1100px){#app{grid-template-columns:236px minmax(0,1fr) 280px} .tab svg{display:none}}
-@media (max-width:860px){
+@media (max-width:1100px){#app{grid-template-columns:236px minmax(0,1fr) 280px} #projName{width:170px}}
+.show-sm{display:none}
+
+/* ---------- phones & small tablets (portrait), and phones held sideways ---------- */
+@media (max-width:860px), (max-height:520px) and (orientation:landscape){
   :root{--headw:44px}
-  #app{grid-template-columns:minmax(0,1fr);grid-template-rows:50px minmax(0,1fr) 210px calc(58px + env(safe-area-inset-bottom,0px));
-    grid-template-areas:"top" "stage" "tl" "bar"}
-  #projName,.hide-sm{display:none}
+  #app{grid-template-columns:minmax(0,1fr);grid-template-rows:48px minmax(0,1fr) 212px calc(58px + env(safe-area-inset-bottom,0px));
+    grid-template-areas:"top" "stage" "tl" "bar";
+    padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+  #projName,.hide-sm,.hide-mob{display:none}
+  .show-sm{display:inline-flex}
+  /* top bar: logo mark only, save state as a dot, compact controls — everything fits at 320px */
+  .topbar{gap:6px;padding-inline:10px}
+  .brand .bname{display:none}
+  .brand i{width:22px;height:22px}
+  #projBtn{padding-inline:9px}
+  .savest{font-size:0;width:8px;height:8px;border-radius:50%;background:#4a8f6a;flex:none}
+  .savest[data-s="Saving…"]{background:var(--muted)}
+  .savest[data-s="Not saved"],.savest[data-s="Not saving"]{background:#ff5d61}
+  .topbar .ibtn{min-width:34px;padding-inline:6px}
+  #exportBtn{padding-inline:11px;flex:none}
   .head span{display:none}
   .head{padding-inline:0;justify-content:center}
-  .panel.sheet{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));max-height:64%;z-index:30;border:0;border-top:1px solid var(--line);
+  .panel.sheet{position:fixed;left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);bottom:calc(58px + env(safe-area-inset-bottom,0px));max-height:64%;z-index:30;border:0;border-top:1px solid var(--line);
     border-radius:14px 14px 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.5);transform:translateY(calc(100% + 80px));transition:transform .22s ease;visibility:hidden}
   .panel.sheet.open{transform:none;visibility:visible}
   .sheet-close{display:inline-flex}
+  .tabs{overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
   #mbar{grid-area:bar;display:flex;border-top:1px solid var(--line);background:var(--panel);padding-bottom:env(safe-area-inset-bottom,0px)}
-  #mbar button{flex:1;display:grid;justify-items:center;align-content:center;gap:3px;font-size:11px;font-weight:700;color:var(--muted)}
+  #mbar button{flex:1;min-width:0;display:grid;justify-items:center;align-content:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--muted)}
   #mbar button.on{color:var(--cue)}
   #mbar svg{width:20px;height:20px}
-  .viewer{padding:10px}
-  .transport{padding:6px 10px}
+  .viewer{padding:8px}
+  .transport{padding:5px 10px;gap:4px}
+  .tc{font-size:12px}
   .tside .pill{display:none}
-  #zoom{width:80px}
+  /* timeline toolbar: icons only, no slider (zoom − / +), scrolls rather than clips if ever too tight */
+  .tlbar{gap:2px;padding:4px 6px;overflow-x:auto;scrollbar-width:none}
+  .tlbar::-webkit-scrollbar{display:none}
+  .tlbar .ibtn{min-width:34px;padding-inline:4px;flex:none}
+  .tlbar .div{margin-inline:3px;flex:none}
+  #zoom{display:none}
+  .toast{bottom:calc(72px + env(safe-area-inset-bottom,0px))}
+  .modal{padding:16px}
+  .plist{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .pthumb{height:110px}
+}
+/* phone held sideways: preview left, timeline right, sheets slide in from the right */
+@media (max-height:520px) and (orientation:landscape){
+  #app{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);grid-template-rows:44px minmax(0,1fr) calc(46px + env(safe-area-inset-bottom,0px));
+    grid-template-areas:"top top" "stage tl" "bar bar"}
+  #timeline{border-top:0;border-left:1px solid var(--line)}
+  #mbar button{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11px}
+  #mbar svg{width:18px;height:18px}
+  .panel.sheet{top:44px;left:auto;width:min(420px,56vw);max-height:none;bottom:calc(46px + env(safe-area-inset-bottom,0px));border-top:0;border-left:1px solid var(--line);
+    border-radius:14px 0 0 0;box-shadow:-14px 0 30px rgba(0,0,0,.45);transform:translateX(calc(100% + 40px))}
+  .toast{bottom:calc(56px + env(safe-area-inset-bottom,0px))}
+}
+/* fingers need bigger grab handles than a mouse */
+@media (pointer:coarse){
+  .clip .h{width:16px}
+  .mk .mh{width:16px}
+  .mk .mh.l{left:-6px}
+  .ruler{height:30px}
+  .trans{width:26px;height:26px;margin:-13px 0 0 -13px}
+  /* iPhone zooms the page when a text field under 16px gets focus */
+  input:not([type=range]):not([type=checkbox]):not([type=color]),textarea,select{font-size:16px!important}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
 <div id="app">
   <header class="topbar">
-    <div class="brand"><i></i>Splice Studio</div>
+    <div class="brand"><i></i><span class="bname">Splice Studio</span></div>
     <button class="btn ghost" id="projBtn" title="Your saved projects"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="hide-sm">Projects</span></button>
     <input id="projName" aria-label="Project name" value="Weekend highlights">
-    <span class="savest" id="saveSt" role="status">Saved</span>
+    <span class="savest" id="saveSt" role="status" title="Saved on this device">Saved</span>
     <div class="sp"></div>
     <button class="ibtn" id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
     <button class="ibtn" id="redoBtn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
@@ -353,15 +404,17 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 
   <section id="timeline">
     <div class="tlbar">
-      <button class="ibtn" id="splitBtn" title="Split at playhead (S)"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg><span class="hide-sm">Split</span></button>
+      <button class="ibtn hide-mob" id="splitBtn" title="Split at playhead (S)"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg><span class="hide-sm">Split</span></button>
       <button class="ibtn" id="dupBtn" title="Duplicate (Ctrl+D)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><span class="hide-sm">Duplicate</span></button>
       <button class="ibtn" id="delBtn" title="Delete (Del)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg><span class="hide-sm">Delete</span></button>
-      <div class="div"></div>
+      <div class="div hide-mob"></div>
       <button class="ibtn" id="hlBtn" title="Highlight at playhead (M)"><svg viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg><span class="hide-sm">Highlight</span></button>
-      <button class="ibtn" id="addTextBtn" title="Add text at playhead"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg><span class="hide-sm">Text</span></button>
+      <button class="ibtn hide-mob" id="addTextBtn" title="Add text at playhead"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg><span class="hide-sm">Text</span></button>
       <button class="ibtn" id="importBtn2" title="Import media"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="hide-sm">Import</span></button>
       <div class="sp"></div>
       <button class="ibtn on" id="snapBtn" title="Snap to edges and playhead" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M6 3v8a6 6 0 0 0 12 0V3"/><path d="M6 7h4M14 7h4"/></svg></button>
+      <button class="ibtn show-sm" id="zoomOut" aria-label="Zoom timeline out" title="Zoom out"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-4-4"/></svg></button>
+      <button class="ibtn show-sm" id="zoomIn" aria-label="Zoom timeline in" title="Zoom in"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M20 20l-4-4"/></svg></button>
       <input type="range" id="zoom" min="8" max="320" value="60" aria-label="Timeline zoom">
       <button class="ibtn" id="fitBtn" title="Fit timeline to window"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
     </div>
@@ -1613,7 +1666,7 @@ async function saveBlob(blob,name){
 $('#exportBtn').onclick=openExport;
 
 /* ---------------- mobile sheets ---------------- */
-const isMobile=()=>matchMedia('(max-width:860px)').matches;
+const isMobile=()=>matchMedia('(max-width:860px), (max-height:520px) and (orientation:landscape)').matches;
 function closeSheets(){ $('#left').classList.remove('open'); $('#right').classList.remove('open'); document.querySelectorAll('#mbar button').forEach(b=>b.classList.remove('on')); }
 function openSheet(which){ closeSheets(); $(which==='edit'?'#right':'#left').classList.add('open'); const b=document.querySelector(`#mbar [data-m="${which}"]`); if(b) b.classList.add('on'); }
 function openSheetIfMobile(){ if(isMobile() && sel) openSheet('edit'); }
@@ -1636,6 +1689,7 @@ $('#hlBtn').onclick=addHighlight;
 $('#undoBtn').onclick=undo; $('#redoBtn').onclick=redo;
 $('#zoom').oninput=e=>setZoom(+e.target.value);
 $('#fitBtn').onclick=fitZoom;
+$('#zoomOut').onclick=()=>setZoom(pps/1.4); $('#zoomIn').onclick=()=>setZoom(pps*1.4);
 $('#snapBtn').onclick=e=>{ snap=!snap; const b=e.currentTarget; b.classList.toggle('on',snap); b.setAttribute('aria-pressed',snap); toast(snap?'Snapping on':'Snapping off'); };
 window.addEventListener('pointerdown',ensureAudio,{capture:true});
 window.addEventListener('keydown',e=>{
@@ -1753,7 +1807,7 @@ const DB={db:null,
 let dbOK=false, curId=null, curCreated=0, loadingProj=false, saveTimer=0, askedPersist=false;
 const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
-function setSaveState(s){ const el=$('#saveSt'); if(el){ el.textContent=s; el.dataset.s=s; } }
+function setSaveState(s){ const el=$('#saveSt'); if(el){ el.textContent=s; el.dataset.s=s; el.title=s==='Saved'?'Saved on this device':s; } }
 function persistMedia(m){
   if(!dbOK||!m.blob) return Promise.resolve();
   return DB.put('media',{id:m.id,name:m.name,kind:m.kind,blob:m.blob,dur:isFinite(m.dur)?m.dur:null,w:m.w,h:m.h,sample:!!m.sample,
