@@ -111,6 +111,7 @@ svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .viewer{flex:1;min-height:0;display:grid;place-items:center;padding:16px;position:relative}
 #cv{background:#000;box-shadow:0 10px 40px rgba(0,0,0,.5);border-radius:3px;touch-action:none;display:block}
 .transport{flex:none;display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--line)}
+.tc b{font-weight:inherit}
 .tc{font:500 13px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--fg);white-space:nowrap}
 .tc span{color:var(--dim)}
 .play{width:40px;height:40px;border-radius:50%;background:var(--fg);color:var(--bg);display:grid;place-items:center}
@@ -548,7 +549,11 @@ function connectEl(r){
   if(r.gain||!actx) return;
   try{ const s=actx.createMediaElementSource(r.el); const g=actx.createGain(); g.gain.value=0; s.connect(g); g.connect(master); r.gain=g; r.el.volume=1; }catch(e){}
 }
-function setGain(r,g){ g=Math.max(0,g); if(r.gain) r.gain.gain.value=g; else r.el.volume=clamp(g,0,1); }
+function setGain(r,g){
+  g=Math.max(0,g); if(r.lastG!=null && Math.abs(r.lastG-g)<.002) return; r.lastG=g;
+  if(r.gain){ try{ r.gain.gain.setTargetAtTime(g,actx.currentTime,.012); }catch(e){ r.gain.gain.value=g; } } else r.el.volume=clamp(g,0,1);
+}
+function releaseEl(id){ const r=els.get(id); if(!r) return; r.el.pause(); if(r.gain) try{r.gain.disconnect()}catch(e){} r.el.removeAttribute('src'); r.el.load(); r.el.remove(); els.delete(id); }
 function getEl(item){
   const m=media[item.mediaId]; if(!m||m.kind==='image') return null;
   let r=els.get(item.id);
@@ -562,7 +567,7 @@ function getEl(item){
 }
 function pruneEls(){
   const live=new Set([...P.clips.map(c=>c.id),...P.audio.map(a=>a.id)]);
-  els.forEach((r,id)=>{ if(!live.has(id)){ r.el.pause(); if(r.gain) try{r.gain.disconnect()}catch(e){} r.el.removeAttribute('src'); r.el.load(); r.el.remove(); els.delete(id);} });
+  els.forEach((r,id)=>{ if(!live.has(id)) releaseEl(id); });
 }
 
 /* ---------------- timing ---------------- */
@@ -587,20 +592,53 @@ function visualAt(t){
 }
 const ease=p=>{p=clamp(p,0,1);return p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2};
 
+/* Playback sync.
+   The video on screen is the clock (see loop), so it is never forced to jump while it plays.
+   Everything else (the other clip in a transition, music) follows it by nudging its speed a few percent,
+   and only seeks if it has drifted a long way. Only clips near the playhead keep a video loaded. */
+let masterId=null;
+function softSync(el,tgt,rate){
+  const d=el.currentTime-tgt;
+  if(Math.abs(d)>.6){ if(!el.seeking) el.currentTime=tgt; if(el.playbackRate!==rate) el.playbackRate=rate; }
+  else if(Math.abs(d)>.05){ const nr=rate*(d>0?.94:1.06); if(Math.abs(el.playbackRate-nr)>.001) el.playbackRate=nr; }
+  else if(el.playbackRate!==rate) el.playbackRate=rate;
+}
+function wantedClipIds(){
+  const cs=P.clips; layout(); let i=cs.findIndex(c=>T>=c._s&&T<c._s+c._d); if(i<0) i=T>=videoEnd()?cs.length-1:0;
+  const ids=new Set(); for(let j=i-1;j<=i+2;j++) if(cs[j]) ids.add(cs[j].id);
+  if(sel&&sel.type==='clip') ids.add(sel.id);
+  return ids;
+}
 function syncMedia(){
   const v=visualAt(T); const act=new Map();
   if(v){ if(v.b){ const e=ease(v.p); act.set(v.a.id,1-e); act.set(v.b.id,e); } else act.set(v.a.id,1); }
+  const want=wantedClipIds();
   for(const c of P.clips){
+    const m=media[c.mediaId]; if(!m||m.kind!=='video') continue;
+    if(!want.has(c.id)){ if(els.has(c.id)) releaseEl(c.id); continue; }
     const r=getEl(c); if(!r) continue; const el=r.el;
     const local=T-c._s, mix=act.get(c.id);
     const tgt=c.in+clamp(local,0,c._d-0.001)*c.speed;
+    // pre-roll: start the next clip a moment before its cut (silently, or fading in during a transition) so it's already
+    // moving when it appears; post-roll: the outgoing clip keeps moving through a transition instead of freezing
+    if(playing){
+      const pre=c.in+local*c.speed;
+      const rolling= mix===undefined ? (local<0 && local>-.25 && pre>=0)                    // hard cut: a quarter-second head start
+        : (!lowFx && ((local<0 && local>-1.05 && pre>=0) || (local>=c._d && local<c._d+1.05 && pre<=m.dur-.05))); // transition: both clips keep moving, if the device can keep up
+      if(rolling){
+        setGain(r, mix!==undefined? c.volume*mix : 0);
+        if(el.paused){ if(Math.abs(el.currentTime-pre)>.08) el.currentTime=pre; if(el.playbackRate!==c.speed) el.playbackRate=c.speed; el.play().catch(()=>{}); }
+        else softSync(el,pre,c.speed);
+        continue;
+      }
+    }
     if(mix!==undefined){
       const run=playing && local>=0 && local<c._d;
-      if(el.playbackRate!==c.speed) try{el.playbackRate=c.speed}catch(e){}
       setGain(r, run? c.volume*mix : 0);
       if(run){
-        if(el.paused){ if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.play().catch(()=>{}); }
-        else if(Math.abs(el.currentTime-tgt)>0.3) el.currentTime=tgt;
+        if(el.paused){ if(el.playbackRate!==c.speed) el.playbackRate=c.speed; if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.play().catch(()=>{}); }
+        else if(c.id===masterId){ if(el.playbackRate!==c.speed) el.playbackRate=c.speed; }
+        else softSync(el,tgt,c.speed);
       } else { if(!el.paused) el.pause(); if(!el.seeking && Math.abs(el.currentTime-tgt)>0.02) el.currentTime=tgt; }
     } else {
       setGain(r,0); if(!el.paused) el.pause();
@@ -615,8 +653,8 @@ function syncMedia(){
     if(playing && inR){
       const g=a.volume*Math.min(1, a.fadeIn>0?local/a.fadeIn:1, a.fadeOut>0?(d-local)/a.fadeOut:1);
       setGain(r,g);
-      if(el.paused){ if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.play().catch(()=>{}); }
-      else if(Math.abs(el.currentTime-tgt)>0.3) el.currentTime=tgt;
+      if(el.paused){ if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.playbackRate=1; el.play().catch(()=>{}); }
+      else softSync(el,tgt,1);
     } else {
       setGain(r,0); if(!el.paused) el.pause();
       if(!el.seeking && Math.abs(el.currentTime-tgt)>0.05) el.currentTime=tgt;
@@ -649,13 +687,14 @@ function composite(dst,A,X,w,h,L,alpha,clipRect,extra){
   let comp='';
   if(L.t||L.k){ const gn=wbGains(L.t,L.k), ag=A.getContext('2d'); ag.save(); ag.setTransform(1,0,0,1,0,0); ag.globalCompositeOperation='multiply';
     ag.fillStyle=`rgb(${gn.map(v=>Math.round(v*255)).join(',')})`; ag.fillRect(0,0,A.width,A.height); ag.restore(); comp=`brightness(${(3/(gn[0]+gn[1]+gn[2])).toFixed(3)})`; }
-  const f0=[comp,L.base,extra||''].join(' ').trim(), f1=[comp,L.base,L.fcss,extra||''].join(' ').trim();
+  const fc=lowFx&&!exporting? L.fcss.replace(/blur\([^)]*\)/g,'') : L.fcss;
+  const f0=[comp,L.base,extra||''].join(' ').trim(), f1=[comp,L.base,fc,extra||''].join(' ').trim();
   dst.save(); if(clipRect){ dst.beginPath(); dst.rect(...clipRect); dst.clip(); } dst.beginPath(); dst.rect(X,0,w,h); dst.clip();
   dst.globalAlpha=alpha;
   if(L.fcss && L.amt<.999){ if(canFilter) dst.filter=f0||'none'; dst.drawImage(A,X,0,w,h); dst.globalAlpha=alpha*L.amt; }
   if(canFilter) dst.filter=f1||'none'; dst.drawImage(A,X,0,w,h); dst.filter='none'; dst.globalAlpha=alpha;
   if(L.fade>0){ dst.globalCompositeOperation='screen'; dst.globalAlpha=alpha*Math.min(1,L.fade*2.2); dst.fillStyle=`rgb(${L.fadeCol||'90,80,70'})`; dst.fillRect(X,0,w,h); dst.globalCompositeOperation='source-over'; dst.globalAlpha=alpha; }
-  if(L.grain>0){ const pat=dst.createPattern(grainTile(),'repeat'), sd=grainSeed; dst.save(); dst.translate(X-((sd*97)%256),-((sd*57)%256));
+  if(L.grain>0 && !(lowFx&&!exporting)){ const pat=dst.createPattern(grainTile(),'repeat'), sd=grainSeed; dst.save(); dst.translate(X-((sd*97)%256),-((sd*57)%256));
     dst.globalCompositeOperation='overlay'; dst.globalAlpha=alpha*Math.min(1,L.grain); dst.fillStyle=pat; dst.fillRect(0,0,w+256,h+256); dst.restore(); }
   if(L.vig>0){ const v=Math.min(1,L.vig), r=Math.hypot(w,h)/2, gr=dst.createRadialGradient(X+w/2,h/2,r*(0.75-v*.4),X+w/2,h/2,r);
     gr.addColorStop(0,'rgba(0,0,0,0)'); gr.addColorStop(1,`rgba(0,0,0,${(v*.85).toFixed(2)})`); dst.fillStyle=gr; dst.fillRect(X,0,w,h); }
@@ -681,7 +720,8 @@ function drawClip(c,local,o={}){
   g.save();
   if(fxOn){ g.fillStyle=P.bg; g.fillRect(0,0,W,H); }
   else { if(o.clip){ g.beginPath(); g.rect(...o.clip); g.clip(); } g.globalAlpha=o.alpha==null?1:o.alpha; if(c.fit==='fit'){ g.fillStyle=P.bg; g.fillRect(dx,0,W,H); }
-    const f=(L.base+' '+L.fcss+' '+(o.filter||'')).trim(); if(f && canFilter) g.filter=f; }
+    const fc=lowFx&&!exporting? L.fcss.replace(/blur\([^)]*\)/g,'') : L.fcss;
+    const f=(L.base+' '+fc+' '+(o.filter||'')).trim(); if(f && canFilter) g.filter=f; }
   g.translate(W/2+ox+dx,H/2); g.scale(c.flipH?-1:1,c.flipV?-1:1); g.rotate(rot*Math.PI/180+a);
   try{ g.drawImage(src,-dw/2,-dh/2,dw,dh); }catch(e){}
   g.restore();
@@ -714,9 +754,16 @@ function lookPreview(m,filterId){
 function wbGains(t,k){ let r=1,g=1,b=1; if(t>0) b-=t*.4; else r-=-t*.4; g-=Math.abs(t)*.05; if(k>0) g-=k*.25; else { r-=-k*.2; b-=-k*.2; } return [r,g,b]; }
 
 /* Auto enhance: measure a frame, then set white balance, levels and saturation */
-function analyseClip(c){
+async function analyseClipAsync(c){
+  const r=analyseClip(c); if(r) return r; const m=media[c.mediaId]; if(!m||m.kind!=='video') return null;
+  const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.preload='auto'; v.src=m.url; let out=null;
+  try{ await waitEvt(v,'loadeddata','error',8000); v.currentTime=Math.min(c.out-.05,c.in+Math.min(1,(c.out-c.in)/2)); await waitEvt(v,'seeked','error',8000); out=analyseClip(c,v); }catch(e){}
+  v.removeAttribute('src'); v.load(); return out;
+}
+function analyseClip(c,ov){
   const m=media[c.mediaId]; if(!m) return null; let src,sw,sh;
-  if(m.kind==='image'){ src=m.img; sw=m.w; sh=m.h; }
+  if(ov){ src=ov; sw=ov.videoWidth; sh=ov.videoHeight; }
+  else if(m.kind==='image'){ src=m.img; sw=m.w; sh=m.h; }
   else { const r=getEl(c); if(!r||r.el.readyState<2) return null; src=r.el; sw=src.videoWidth; sh=src.videoHeight; }
   if(!sw||!sh) return null;
   const cw=112, chh=Math.max(8,Math.round(cw*sh/sw)), cc=document.createElement('canvas'); cc.width=cw; cc.height=chh;
@@ -845,12 +892,31 @@ const fmtTC=t=>{ t=Math.max(0,t); const m=Math.floor(t/60), s=Math.floor(t%60), 
 const fmtD=s=>s<60?`${s.toFixed(1)}s`:`${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}`;
 let lastTC='';
 function updTime(){
-  const s=`${fmtTC(T)} <span>/ ${fmtTC(total())}</span>`; if(s!==lastTC){ $('#tc').innerHTML=s; lastTC=s; }
+  const a=fmtTC(T), b=fmtTC(total());
+  if(lastTC!==b){ $('#tc').innerHTML=`<b id="tcNow">${a}</b> <span>/ ${b}</span>`; lastTC=b; } else { const n=document.getElementById('tcNow'); if(n.textContent!==a) n.textContent=a; }
   const ph=$('#ph'); if(ph) ph.style.left=(headW()+T*pps)+'px';
 }
+let lastNow=0, frameAvg=16, lowFx=false, lastDraw=0;
+function pickMaster(){
+  const v=visualAt(T); if(!v) return null;
+  const c=(v.b && T>=v.b._s)?v.b:v.a, m=media[c.mediaId];
+  return m&&m.kind==='video'?c:null;
+}
 function loop(now){
+  const dt=lastNow?now-lastNow:16; lastNow=now;
   if(playing){
-    T=playT0+(now-playW0)/1000;
+    let t=playT0+(now-playW0)/1000;
+    masterId=null;
+    const mc=pickMaster(), r=mc&&els.get(mc.id);
+    if(r && !r.el.paused){
+      if(r.el.seeking||r.el.readyState<3) t=T;                       // still loading: wait for it rather than run ahead
+      else { const lt=(r.el.currentTime-mc.in)/mc.speed;
+        if(lt>=-.1 && lt<=mc._d+.15){ t=Math.max(T,mc._s+lt); masterId=mc.id; } }   // follow the video; never step backwards
+      playT0=t; playW0=now;
+    }
+    T=t;
+    // if frames are taking too long, simplify the preview (grain, soft-blur) so motion stays smooth; export is unaffected
+    if(dt<250){ frameAvg=frameAvg*.94+dt*.06; if(!lowFx && !exporting && frameAvg>30 && T>1){ lowFx=true; toast('Preview simplified to keep playback smooth. Your export keeps full quality.'); } }
     const tot=total();
     if(loopRange && !exporting && T>=loopRange.e){ T=loopRange.s; playT0=T; playW0=now; syncMedia(); }
     else if(T>=tot){ T=tot; setPlaying(false); if(exporting) finishRecording(); }
@@ -859,7 +925,9 @@ function loop(now){
     if(x>tls.scrollLeft+tls.clientWidth-40 || x<tls.scrollLeft+headW()) tls.scrollLeft=x-headW()-40;
   }
   syncMedia();
-  if(playing||dirty){ draw(); updTime(); dirty=false; }
+  // video only changes ~30 times a second: on 60/120 Hz screens, skip the in-between redraws while video is driving playback
+  const skip=playing && masterId && !exporting && !dirty && now-lastDraw<30;
+  if((playing||dirty) && !skip){ draw(); updTime(); dirty=false; lastDraw=now; }
   requestAnimationFrame(loop);
 }
 
@@ -1558,10 +1626,10 @@ insp.addEventListener('click',e=>{
     o.adj={...o.adj,...r}; commit(); renderInspector(); dirty=true; toast('Light and colour balanced');
   }
   else if(act==='autoAll'){
-    let done=0, skipped=0;
-    P.clips.forEach(c=>{ const r=analyseClip(c); if(r){ c.adj={...c.adj,...r}; done++; } else skipped++; });
-    commit(); renderInspector(); dirty=true;
-    toast(skipped?`Enhanced ${done} clips. ${skipped} hadn’t loaded yet; play through once and run it again.`:`Enhanced all ${done} clips`);
+    (async()=>{ let done=0, skipped=0; toast('Enhancing clips…');
+      for(const c of P.clips){ const r=await analyseClipAsync(c); if(r){ c.adj={...c.adj,...r}; done++; } else skipped++; }
+      commit(); renderInspector(); dirty=true;
+      toast(skipped?`Enhanced ${done} clips. ${skipped} couldn\u2019t be read.`:`Enhanced all ${done} clips`); })();
   }
   else if(act==='resetAdj'){ const o=selObj(); o.adj={b:0,c:0,s:0,t:0,k:0}; o.vig=0; commit(); renderInspector(); dirty=true; }
   else if(act==='lookAll'){ const o=selObj(); P.clips.forEach(c=>{ c.filter=o.filter; c.fxAmt=o.fxAmt==null?100:o.fxAmt; c.adj={...o.adj}; c.vig=o.vig||0; }); commit(); renderTL(); toast('Look copied to every clip'); dirty=true; }
