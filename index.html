@@ -191,6 +191,23 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 .mfoot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 #outVid{width:100%;max-height:44vh;background:#000;border-radius:6px}
 
+.savest{font-size:11px;font-weight:700;color:var(--dim);white-space:nowrap}
+.savest[data-s="Saving…"]{color:var(--muted)}
+.savest[data-s="Not saved"],.savest[data-s="Not saving"]{color:#ff8a8d}
+.modal.wide{width:min(760px,100%)}
+.mhead{display:flex;align-items:center;gap:8px}
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+.pcard{background:var(--raise);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;border:1px solid transparent;min-width:0}
+.pcard.cur{border-color:rgba(242,193,78,.5)}
+.pthumb{height:130px;background:#07080b;display:grid;place-items:center;position:relative;width:100%}
+.pthumb span{height:100%;max-width:100%;background:#1d2129 center/cover no-repeat}
+.pthumb em{position:absolute;left:8px;top:8px;font:700 9px/1 var(--f-ui);font-style:normal;letter-spacing:.06em;text-transform:uppercase;background:var(--cue);color:var(--cue-ink);padding:3px 5px;border-radius:3px}
+.pmeta{padding:10px 10px 4px;display:grid;gap:2px;min-width:0}
+.pmeta b{font:800 14px/1.25 var(--f-brand);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pmeta span{font-size:11px;color:var(--muted)}
+.pacts{display:flex;gap:4px;padding:6px 10px 10px;align-items:center}
+.pacts .btn{height:30px;font-size:12px;flex:1;justify-content:center}
+.pacts .ibtn.armed{color:#ff8a8d;background:rgba(229,72,77,.12);font-size:11px;font-weight:700}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);font-weight:700;padding:9px 14px;border-radius:8px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:calc(100% - 32px)}
 .dropover{position:fixed;inset:0;z-index:40;background:rgba(242,193,78,.08);border:3px dashed var(--cue);display:grid;place-items:center;font:800 22px var(--f-brand);pointer-events:none}
 #hold{position:fixed;width:2px;height:2px;overflow:hidden;opacity:0;pointer-events:none;left:0;top:0}
@@ -223,7 +240,9 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 <div id="app">
   <header class="topbar">
     <div class="brand"><i></i>Splice Studio</div>
+    <button class="btn ghost" id="projBtn" title="Your saved projects"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span class="hide-sm">Projects</span></button>
     <input id="projName" aria-label="Project name" value="Weekend highlights">
+    <span class="savest" id="saveSt" role="status">Saved</span>
     <div class="sp"></div>
     <button class="ibtn" id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
     <button class="ibtn" id="redoBtn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
@@ -286,6 +305,15 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="exH">
     <h2 id="exH">Export video</h2>
     <div id="exBody"></div>
+  </div>
+</div>
+<div class="scrim" id="projModal" hidden>
+  <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="pjH">
+    <div class="mhead"><h2 id="pjH">Projects</h2><div class="sp"></div>
+      <button class="btn primary" id="newProj"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New project</button>
+      <button class="ibtn" data-closepj aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <p class="note" id="pjStore">Projects save automatically on this device as you edit.</p>
+    <div class="plist" id="plist"></div>
   </div>
 </div>
 <input type="file" id="file" multiple accept="video/*,audio/*,image/*" hidden>
@@ -586,9 +614,9 @@ let hist=[], hi=-1;
 function snapshot(){ return JSON.stringify(P,(k,v)=>k.startsWith('_')?undefined:v); }
 function commit(){
   const s=snapshot(); if(hist[hi]===s) return;
-  hist=hist.slice(0,hi+1); hist.push(s); if(hist.length>100) hist.shift(); hi=hist.length-1; updUndo();
+  hist=hist.slice(0,hi+1); hist.push(s); if(hist.length>100) hist.shift(); hi=hist.length-1; updUndo(); scheduleSave();
 }
-function restore(i){ hi=i; P=JSON.parse(hist[hi]); if(sel && !selObj()) sel=null; applyAspect(false); renderAll(); updUndo(); }
+function restore(i){ hi=i; P=JSON.parse(hist[hi]); if(sel && !selObj()) sel=null; applyAspect(false); renderAll(); updUndo(); scheduleSave(); }
 function undo(){ if(hi>0) restore(hi-1); }
 function redo(){ if(hi<hist.length-1) restore(hi+1); }
 function updUndo(){ $('#undoBtn').disabled=hi<=0; $('#redoBtn').disabled=hi>=hist.length-1; }
@@ -822,7 +850,7 @@ async function makeStrip(m){
       g.drawImage(v,i*fw,0,fw,fh);
       if(i===0){ const t=document.createElement('canvas'); t.width=fw*2; t.height=fh*2; t.getContext('2d').drawImage(v,0,0,t.width,t.height); m.thumb=t.toDataURL('image/jpeg',.75); renderBin(); }
     }
-    m.strip=c.toDataURL('image/jpeg',.7); v.removeAttribute('src'); v.load(); renderTL(); renderBin();
+    m.strip=c.toDataURL('image/jpeg',.7); v.removeAttribute('src'); v.load(); renderTL(); renderBin(); persistMedia(m);
   }catch(e){}
 }
 async function makeWave(m,buf){
@@ -834,7 +862,7 @@ async function makeWave(m,buf){
     let peak=0.01; const pk=new Float32Array(n);
     for(let i=0;i<n;i++){ let mx=0; for(let j=i*per;j<(i+1)*per&&j<ch.length;j+=4){ const v=Math.abs(ch[j]); if(v>mx) mx=v; } pk[i]=mx; if(mx>peak) peak=mx; }
     for(let i=0;i<n;i++){ const bh=Math.max(1,pk[i]/peak*h*.9); g.fillRect(i,(h-bh)/2,1,bh); }
-    m.wave=c.toDataURL(); renderTL(); renderBin();
+    m.wave=c.toDataURL(); renderTL(); renderBin(); if(media[m.id]) persistMedia(m);
   }catch(e){}
 }
 async function importFiles(files){
@@ -844,8 +872,9 @@ async function importFiles(files){
     if(!kind){ toast(`${f.name} isn't a video, audio or image file`); continue; }
     const m={id:uid(),name:f.name,kind,url:URL.createObjectURL(f)};
     try{ await probe(m,f); }catch(e){ toast(`Couldn't open ${f.name}. Try MP4, MOV, WebM, MP3, WAV, JPG or PNG.`); URL.revokeObjectURL(m.url); continue; }
-    media[m.id]=m; added.push(addMedia(m,false));
+    m.blob=f; media[m.id]=m; added.push(addMedia(m,false)); await persistMedia(m);
   }
+  if(added.length && dbOK && !askedPersist && navigator.storage && navigator.storage.persist){ askedPersist=true; navigator.storage.persist().catch(()=>{}); }
   if(added.length){ sel=added[added.length-1]; commit(); renderAll(); renderBin(); toast(`Added ${added.length} item${added.length>1?'s':''} to the timeline`); }
 }
 $('#file').addEventListener('change',e=>{ importFiles([...e.target.files]); e.target.value=''; });
@@ -1109,7 +1138,7 @@ window.addEventListener('keydown',e=>{
   else if(e.key==='Delete'||e.key==='Backspace'){ e.preventDefault(); deleteSel(); }
   else if(e.key==='ArrowLeft'){ e.preventDefault(); seek(T-(e.shiftKey?1:1/FPS)); }
   else if(e.key==='ArrowRight'){ e.preventDefault(); seek(T+(e.shiftKey?1:1/FPS)); }
-  else if(e.key==='Escape'){ select(null); closeSheets(); }
+  else if(e.key==='Escape'){ if(!$('#projModal').hidden){ closeProjects(); return; } select(null); closeSheets(); }
 });
 let toastT=0;
 function toast(msg){ let t=document.querySelector('.toast'); if(!t){ t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); document.body.appendChild(t);} t.textContent=msg; clearTimeout(toastT); toastT=setTimeout(()=>t.remove(),2400); }
@@ -1173,11 +1202,12 @@ function synthMusic(sec=12,sr=22050){
 async function loadSample(){
   const defs=[['sun','Sunrise.jpg'],['pitch','Pitch.jpg'],['city','Skyline.jpg']]; const ms=[];
   for(const [k,name] of defs){
-    const blob=await scene(k); const m={id:uid(),name,kind:'image',url:URL.createObjectURL(blob),sample:true};
+    const blob=await scene(k); const m={id:uid(),name,kind:'image',url:URL.createObjectURL(blob),blob,sample:true};
     await probe(m); media[m.id]=m; ms.push(m);
   }
-  const wav=synthMusic(); const am={id:uid(),name:'Sample loop.wav',kind:'audio',url:URL.createObjectURL(new Blob([wav],{type:'audio/wav'})),dur:12,sample:true};
-  media[am.id]=am; makeWave(am,wav.slice(0));
+  const wav=synthMusic(); const wblob=new Blob([wav],{type:'audio/wav'});
+  const am={id:uid(),name:'Sample loop.wav',kind:'audio',url:URL.createObjectURL(wblob),blob:wblob,dur:12,sample:true};
+  media[am.id]=am; await makeWave(am,wav.slice(0));
   const c1=newClip(ms[0]), c2=newClip(ms[1]), c3=newClip(ms[2]);
   c1.out=3.6; c1.filter='warm'; c1.motion='zoomIn'; c1.tr={type:'fade',dur:.7};
   c2.out=3.2; c2.filter='vivid'; c2.motion='panR'; c2.tr={type:'slide',dur:.5};
@@ -1191,15 +1221,140 @@ async function loadSample(){
   P.audio=[{id:uid(),mediaId:am.id,start:0,in:0,out:10.6,volume:.8,fadeIn:.3,fadeOut:1.6}];
 }
 
+/* ---------------- saved projects (IndexedDB, on this device) ---------------- */
+const DB={db:null,
+  open(){ return new Promise((res,rej)=>{ if(!window.indexedDB) return rej(new Error('no idb'));
+    const r=indexedDB.open('splice-studio',1);
+    r.onupgradeneeded=()=>{ const d=r.result; d.createObjectStore('projects',{keyPath:'id'}); d.createObjectStore('media',{keyPath:'id'}); };
+    r.onsuccess=()=>{ this.db=r.result; res(this.db); }; r.onerror=()=>rej(r.error); r.onblocked=()=>rej(new Error('blocked')); }); },
+  tx(st,mode,fn){ return new Promise((res,rej)=>{ const t=this.db.transaction(st,mode), q=fn(t.objectStore(st)); let out;
+    if(q) q.onsuccess=()=>{ out=q.result; }; t.oncomplete=()=>res(out); t.onerror=t.onabort=()=>rej(t.error); }); },
+  get(st,id){ return this.tx(st,'readonly',s=>s.get(id)); },
+  put(st,v){ return this.tx(st,'readwrite',s=>s.put(v)); },
+  del(st,id){ return this.tx(st,'readwrite',s=>s.delete(id)); },
+  all(st){ return this.tx(st,'readonly',s=>s.getAll()); }
+};
+let dbOK=false, curId=null, curCreated=0, loadingProj=false, saveTimer=0, askedPersist=false;
+const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
+const lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
+function setSaveState(s){ const el=$('#saveSt'); if(el){ el.textContent=s; el.dataset.s=s; } }
+function persistMedia(m){
+  if(!dbOK||!m.blob) return Promise.resolve();
+  return DB.put('media',{id:m.id,name:m.name,kind:m.kind,blob:m.blob,dur:isFinite(m.dur)?m.dur:null,w:m.w,h:m.h,sample:!!m.sample,
+    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null}).catch(()=>toast('Your device is out of storage space for saved media.'));
+}
+function thumbOf(){ try{ const c=document.createElement('canvas'), k=240/Math.max(W,H); c.width=Math.round(W*k); c.height=Math.round(H*k); c.getContext('2d').drawImage(cv,0,0,c.width,c.height); return c.toDataURL('image/jpeg',.7); }catch(e){ return null; } }
+function scheduleSave(){ if(!dbOK||!curId||loadingProj) return; setSaveState('Saving…'); clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,700); }
+async function saveNow(){
+  clearTimeout(saveTimer); if(!dbOK||!curId||loadingProj) return;
+  const rec={id:curId,name:($('#projName').value||'').trim()||'Untitled edit',created:curCreated||Date.now(),updated:Date.now(),
+    P:JSON.parse(snapshot()),mediaIds:Object.keys(media),thumb:exporting?null:thumbOf(),dur:total(),T};
+  if(!rec.thumb){ const old=await DB.get('projects',curId).catch(()=>null); if(old) rec.thumb=old.thumb; }
+  try{ await DB.put('projects',rec); setSaveState('Saved'); lsSet('splice.last',curId); }
+  catch(e){ setSaveState('Not saved'); toast('Couldn’t save this project. Your device may be out of space.'); }
+}
+function clearWorkspace(){
+  setPlaying(false);
+  els.forEach(r=>{ r.el.pause(); if(r.gain) try{r.gain.disconnect()}catch(e){} r.el.removeAttribute('src'); r.el.load(); r.el.remove(); }); els.clear();
+  for(const k of Object.keys(media)){ try{ URL.revokeObjectURL(media[k].url); }catch(e){} delete media[k]; }
+  sel=null; hist=[]; hi=-1;
+}
+async function openProject(id){
+  if(curId && curId!==id) await saveNow();
+  const rec=await DB.get('projects',id); if(!rec){ toast('That project couldn’t be found'); return; }
+  loadingProj=true; clearWorkspace();
+  let missing=0;
+  for(const mid of rec.mediaIds||[]){
+    const mr=await DB.get('media',mid).catch(()=>null); if(!mr||!mr.blob){ missing++; continue; }
+    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave};
+    try{
+      if(m.kind==='image'){ const img=new Image(); img.src=m.url; await img.decode(); m.img=img; m.w=img.naturalWidth; m.h=img.naturalHeight; m.thumb=m.url; m.dur=Infinity; }
+      else if(m.kind==='video' && !m.strip) makeStrip(m).then(()=>persistMedia(m));
+      else if(m.kind==='audio' && !m.wave) m.blob.arrayBuffer().then(b=>makeWave(m,b)).then(()=>persistMedia(m)).catch(()=>{});
+    }catch(e){ missing++; continue; }
+    media[m.id]=m;
+  }
+  P=rec.P; curId=rec.id; curCreated=rec.created; $('#projName').value=rec.name; T=clamp(rec.T||0,0,1e9);
+  applyAspect(false); commit(); loadingProj=false; lsSet('splice.last',curId);
+  renderAll(); renderLeft(); requestAnimationFrame(()=>fitZoom()); setSaveState('Saved');
+  if(missing) toast(`${missing} media file${missing>1?'s':''} couldn’t be loaded from this device`);
+}
+async function newProject(){
+  if(curId) await saveNow();
+  loadingProj=true; clearWorkspace();
+  P={aspect:'9:16',bg:'#000000',clips:[],texts:[],audio:[]}; T=0;
+  curId=uid(); curCreated=Date.now(); $('#projName').value='Untitled edit';
+  applyAspect(false); commit(); loadingProj=false;
+  renderAll(); ltab='media'; renderLeft(); fitZoom(); await saveNow();
+  closeProjects(); toast('New project. Import media to get started.');
+}
+async function deleteProject(id){
+  const recs=await DB.all('projects'); const rec=recs.find(r=>r.id===id); if(!rec) return;
+  const inUse=new Set(); recs.forEach(r=>{ if(r.id!==id) (r.mediaIds||[]).forEach(m=>inUse.add(m)); });
+  for(const mid of rec.mediaIds||[]) if(!inUse.has(mid)) await DB.del('media',mid).catch(()=>{});
+  await DB.del('projects',id);
+  if(id===curId){
+    curId=null; const rest=recs.filter(r=>r.id!==id).sort((a,b)=>b.updated-a.updated);
+    if(rest.length) await openProject(rest[0].id); else { await newProject(); return; }
+  }
+  toast(`Deleted “${rec.name}”`); renderProjects();
+}
+async function duplicateProject(id){
+  await saveNow(); const rec=await DB.get('projects',id); if(!rec) return;
+  const copy={...rec,id:uid(),name:rec.name+' copy',created:Date.now(),updated:Date.now()};
+  await DB.put('projects',copy); toast('Copy made'); renderProjects();
+}
+const ago=ts=>{ const s=(Date.now()-ts)/1000; if(s<60) return 'just now'; if(s<3600) return Math.floor(s/60)+' min ago'; if(s<86400) return Math.floor(s/3600)+' h ago';
+  const d=new Date(ts); return d.toLocaleDateString(undefined,{day:'numeric',month:'short'}); };
+async function renderProjects(){
+  const list=$('#plist'); if(!dbOK){ list.innerHTML='<p class="note">This browser window can’t store projects (private browsing or blocked site data). You can still edit and export.</p>'; return; }
+  const recs=(await DB.all('projects')).sort((a,b)=>b.updated-a.updated);
+  list.innerHTML=recs.map(r=>{ const [w,h]=ASPECTS[(r.P&&r.P.aspect)||'9:16']||[16,9]; return `
+    <div class="pcard${r.id===curId?' cur':''}">
+      <button class="pthumb" data-open="${r.id}" aria-label="Open ${esc(r.name)}"><span style="aspect-ratio:${w}/${h};${r.thumb?`background-image:url(${r.thumb})`:''}"></span>${r.id===curId?'<em>Open now</em>':''}</button>
+      <div class="pmeta"><b>${esc(r.name)}</b><span>${fmtTC(r.dur||0).slice(0,5)} · edited ${ago(r.updated)}</span></div>
+      <div class="pacts"><button class="btn" data-open="${r.id}">${r.id===curId?'Keep editing':'Open'}</button>
+        <button class="ibtn" data-dupp="${r.id}" title="Make a copy" aria-label="Make a copy of ${esc(r.name)}">${ICON.copy}</button>
+        <button class="ibtn" data-delp="${r.id}" title="Delete" aria-label="Delete ${esc(r.name)}">${ICON.trash}</button></div>
+    </div>`; }).join('') || '<p class="note">No saved projects yet.</p>';
+  if(navigator.storage&&navigator.storage.estimate) navigator.storage.estimate().then(e=>{ $('#pjStore').textContent=`${recs.length} project${recs.length===1?'':'s'} · ${(e.usage/1048576).toFixed(0)} MB stored on this device`; }).catch(()=>{});
+}
+function openProjects(){ saveNow(); $('#projModal').hidden=false; renderProjects(); }
+function closeProjects(){ $('#projModal').hidden=true; }
+$('#projBtn').onclick=openProjects;
+$('#newProj').onclick=newProject;
+$('#projModal').addEventListener('click',async e=>{
+  if(e.target===e.currentTarget||e.target.closest('[data-closepj]')){ closeProjects(); return; }
+  const o=e.target.closest('[data-open]'); if(o){ const id=o.dataset.open; closeProjects(); if(id!==curId) await openProject(id); return; }
+  const d=e.target.closest('[data-dupp]'); if(d){ duplicateProject(d.dataset.dupp); return; }
+  const x=e.target.closest('[data-delp]');
+  if(x){ if(x.dataset.armed && Date.now()-x.dataset.armed<4000){ deleteProject(x.dataset.delp); }
+    else { x.dataset.armed=Date.now(); x.classList.add('armed'); x.innerHTML=`${ICON.trash}<span>Delete for good?</span>`; } }
+});
+$('#projName').addEventListener('input',scheduleSave);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') saveNow(); });
+window.addEventListener('pagehide',()=>saveNow());
+
 /* ---------------- boot ---------------- */
 (async()=>{
   applyAspect(false); renderLeft();
-  try{ await loadSample(); }catch(e){ console.warn('sample failed',e); }
-  commit(); renderAll(); renderBin();
-  requestAnimationFrame(()=>fitZoom());
   requestAnimationFrame(loop);
   if(document.fonts){ FONTS.forEach(f=>document.fonts.load(`${f.w} 40px ${f.fam}`).then(()=>{dirty=true}).catch(()=>{})); document.fonts.load('italic 400 40px "Instrument Serif"').catch(()=>{}); document.fonts.ready.then(()=>{dirty=true}); }
+  try{ await DB.open(); dbOK=true; }catch(e){ dbOK=false; setSaveState('Not saving'); }
+  if(dbOK){
+    try{
+      const recs=(await DB.all('projects')).sort((a,b)=>b.updated-a.updated);
+      const pick=recs.find(r=>r.id===lsGet('splice.last'))||recs[0];
+      if(pick){ await openProject(pick.id); return; }
+    }catch(e){ console.warn('open failed',e); }
+  }
+  // first visit: start with the sample edit
+  loadingProj=true; curId=uid(); curCreated=Date.now();
+  try{ await loadSample(); }catch(e){ console.warn('sample failed',e); }
+  commit(); loadingProj=false; renderAll(); renderBin();
+  requestAnimationFrame(()=>fitZoom());
   T=1.2; dirty=true;
+  if(dbOK){ for(const m of Object.values(media)) await persistMedia(m); setTimeout(saveNow,300); }
 })();
 })();
 </script>
