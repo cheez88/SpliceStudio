@@ -296,6 +296,10 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 #navPh i{position:absolute;left:50%;bottom:-2px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--cue);box-shadow:0 1px 4px rgba(0,0,0,.5)}
 #nav:focus-visible{outline:2px solid var(--cue);outline-offset:2px}
 .clip.lifted{transform:scale(1.05);box-shadow:0 10px 24px rgba(0,0,0,.55),inset 0 0 0 2px var(--cue);z-index:9}
+.dropbtns{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.emptybtn{position:absolute;left:10px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;gap:6px;height:28px;padding-inline:10px;border-radius:6px;border:1px dashed #3a5a50;color:#8fd3b9;font-size:12px;font-weight:700;white-space:nowrap}
+.emptybtn:hover{background:rgba(43,143,112,.12)}
+.emptybtn svg{width:14px;height:14px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);font-weight:700;padding:9px 14px;border-radius:8px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:calc(100% - 32px)}
 .dropover{position:fixed;inset:0;z-index:40;background:rgba(242,193,78,.08);border:3px dashed var(--cue);display:grid;place-items:center;font:800 22px var(--f-brand);pointer-events:none}
 #hold{position:fixed;width:2px;height:2px;overflow:hidden;opacity:0;pointer-events:none;left:0;top:0}
@@ -464,7 +468,8 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
     <div class="plist" id="plist"></div>
   </div>
 </div>
-<input type="file" id="file" multiple accept="video/*,audio/*,image/*" hidden>
+<input type="file" id="file" multiple accept="video/*,audio/*,image/*,.mov,.mp4,.m4v,.webm,.jpg,.jpeg,.png,.heic,.webp,.gif,.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,.ogg,.oga,.opus,.m4b" hidden>
+<input type="file" id="fileAudio" multiple accept="audio/*,.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,.ogg,.oga,.opus,.m4b" hidden>
 <div id="hold"></div>
 
 <script>
@@ -1057,7 +1062,7 @@ function renderTL(){
     ah+=`<div class="clip a${on?' sel':''}" data-kind="audio" data-id="${a.id}" style="left:${a.start*pps}px;width:${Math.max(6,d*pps)}px;top:${4+ap.map[a.id]*AR}px;height:${AR-4}px;${bg}">
       <div class="h l"></div><span class="lbl">${esc(m.name||'Audio')}</span><div class="h r"></div></div>`;
   }
-  if(!P.audio.length) ah=`<div class="empty">Add music or a voiceover from Media</div>`;
+  if(!P.audio.length) ah=`<button class="emptybtn" data-addmusic>${ICON.music}Add music</button>`;
   tli.innerHTML=`
     <div class="row ruler" id="ruler"><div class="head"></div><div class="track" id="rtrack">${ticks}${mk}</div></div>
     <div class="row lane" style="height:${tp.n*TR+6}px"><div class="head">${ICON.text}<span>Text</span></div><div class="track" id="lt">${th}</div></div>
@@ -1081,6 +1086,7 @@ function snapPts(exId){
 function snapV(v,pts){ if(!snap) return v; const th=8/pps; let best=v,bd=th; for(const p of pts){ const d=Math.abs(p-v); if(d<bd){bd=d;best=p;} } return best; }
 tls.addEventListener('pointerdown',e=>{
   if(e.button!==0) return;
+  if(e.target.closest('[data-addmusic]')){ openMusic(); return; }
   const mkEl=e.target.closest('.mk');
   if(mkEl){
     const id=mkEl.dataset.mark; if(!sel||sel.id!==id) select({type:'mark',id});
@@ -1430,13 +1436,21 @@ function orderTimelineByDate(){
   commit(); renderAll(); toast('Timeline put in the order it was shot');
 }
 
+const EXT_KIND={mp3:'audio',m4a:'audio',m4b:'audio',aac:'audio',wav:'audio',aif:'audio',aiff:'audio',caf:'audio',flac:'audio',ogg:'audio',oga:'audio',opus:'audio',
+  mp4:'video',m4v:'video',mov:'video',webm:'video',mkv:'video','3gp':'video',jpg:'image',jpeg:'image',png:'image',gif:'image',webp:'image',heic:'image',heif:'image',avif:'image'};
+function kindOf(f){
+  const t=(f.type||'').toLowerCase(), ext=(f.name.split('.').pop()||'').toLowerCase();
+  if(t.startsWith('video/')) return ext in EXT_KIND && EXT_KIND[ext]==='audio'?'audio':'video';   // some systems label .m4a/.webm audio as video
+  if(t.startsWith('audio/')) return 'audio'; if(t.startsWith('image/')) return 'image';
+  return EXT_KIND[ext]||null;
+}
 async function importFiles(files){
   const ok=[];
   for(const f of files){
-    const kind=f.type.startsWith('video/')?'video':f.type.startsWith('audio/')?'audio':f.type.startsWith('image/')?'image':null;
+    const kind=kindOf(f);
     if(!kind){ toast(`${f.name} isn't a video, audio or image file`); continue; }
     const m={id:uid(),name:f.name.replace(/\.[^.]+$/,''),kind,url:URL.createObjectURL(f),added:Date.now()};
-    try{ await probe(m,f); }catch(e){ toast(`Couldn't open ${f.name}. Try MP4, MOV, WebM, MP3, WAV, JPG or PNG.`); URL.revokeObjectURL(m.url); continue; }
+    try{ await probe(m,f); }catch(e){ toast(kind==='audio'?`This browser can\u2019t play ${f.name}. MP3, M4A or WAV work everywhere.`:`Couldn't open ${f.name}. Try MP4, MOV, WebM, JPG or PNG.`); URL.revokeObjectURL(m.url); continue; }
     const tk=await readTaken(f); m.taken=tk.t; m.takenSrc=tk.src;
     m.blob=f; media[m.id]=m; ok.push(m);
   }
@@ -1448,6 +1462,8 @@ async function importFiles(files){
   if(added.length){ sel=added[added.length-1]; commit(); renderAll(); renderBin(); toast(`Added ${added.length} item${added.length>1?'s':''} to the timeline`); }
 }
 $('#file').addEventListener('change',e=>{ importFiles([...e.target.files]); e.target.value=''; });
+$('#fileAudio').addEventListener('change',e=>{ importFiles([...e.target.files]); e.target.value=''; });
+const openMusic=()=>$('#fileAudio').click();
 const openPicker=()=>$('#file').click();
 $('#importBtn2').onclick=openPicker;
 let dragDepth=0, dov=null;
@@ -1478,7 +1494,7 @@ function renderBin(){
   binPending=false;
   const items=sortedMedia();
   $('#leftBody').innerHTML=`
-    <div class="drop"><div><b>Drop files here</b> or</div><button class="btn primary" id="importBtn">${ICON.upload}Import media</button><div class="note">Video, photos and audio stay on this device.</div></div>
+    <div class="drop"><div><b>Drop files here</b> or</div><div class="dropbtns"><button class="btn primary" id="importBtn">${ICON.upload}Import media</button><button class="btn" id="musicBtn">${ICON.music}Add music</button></div><div class="note">Video, photos and audio stay on this device. Use <b>Add music</b> for songs in your Downloads or Files.</div></div>
     <div class="binhead"><p class="h6">Media · ${items.length}</p>
       <label class="sortsel"><span>Sort</span><select id="binSort" aria-label="Sort media">
         <option value="taken"${binSort==='taken'?' selected':''}>Date taken</option>
@@ -1496,7 +1512,7 @@ function renderBin(){
           <div class="sub"><span${m.takenSrc?` title="Date ${TAKEN_SRC[m.takenSrc]}"`:''}>${m.taken?fmtTaken(m.taken):m.sample?'Sample':'No date'}</span>${m.kind==='image'?'':`<span class="du">${fmtD(m.dur)}</span>`}</div>
         </div>
       </div>`).join('')}</div>`;
-  $('#importBtn').onclick=openPicker;
+  $('#importBtn').onclick=openPicker; $('#musicBtn').onclick=openMusic;
   $('#binSort').onchange=e=>{ binSort=e.target.value; try{localStorage.setItem('splice.binSort',binSort)}catch(x){} renderBin(); };
   const ob=$('#orderTL'); if(ob) ob.onclick=orderTimelineByDate;
 }
