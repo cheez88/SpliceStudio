@@ -300,6 +300,19 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 .emptybtn{position:absolute;left:10px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;gap:6px;height:28px;padding-inline:10px;border-radius:6px;border:1px dashed #3a5a50;color:#8fd3b9;font-size:12px;font-weight:700;white-space:nowrap}
 .emptybtn:hover{background:rgba(43,143,112,.12)}
 .emptybtn svg{width:14px;height:14px}
+.autob{color:var(--cue)}
+.autob:hover{background:rgba(242,193,78,.12)}
+#mbar button.mauto{color:var(--cue)}
+.autocard{background:linear-gradient(135deg,rgba(242,193,78,.18),rgba(242,193,78,.06));color:var(--cue);border:1px solid rgba(242,193,78,.35)}
+.autolinks{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.autolinks a{text-decoration:none;color:var(--fg)}
+.chk{display:flex;gap:9px;align-items:flex-start;font-size:13px;font-weight:600;color:var(--fg);cursor:pointer;line-height:1.35}
+.chk input{accent-color:var(--cue);width:17px;height:17px;flex:none;margin-top:1px}
+.field .chk+.chk,.field .chk+select,.field .chk+div{margin-top:8px}
+.pxbox{display:grid;gap:8px;padding:10px;border-radius:8px;background:var(--raise);margin-top:8px}
+.pxbox a,.modal .note a{color:var(--cue)}
+.chip-s.px{left:auto;right:5px;bottom:5px;background:#1d2129;color:#8fd3b9}
+.btn[disabled]{opacity:.4;cursor:default}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);font-weight:700;padding:9px 14px;border-radius:8px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:calc(100% - 32px)}
 .dropover{position:fixed;inset:0;z-index:40;background:rgba(242,193,78,.08);border:3px dashed var(--cue);display:grid;place-items:center;font:800 22px var(--f-brand);pointer-events:none}
 #hold{position:fixed;width:2px;height:2px;overflow:hidden;opacity:0;pointer-events:none;left:0;top:0}
@@ -429,6 +442,7 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
       <button class="ibtn" id="dupBtn" title="Duplicate (Ctrl+D)"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg><span class="hide-sm">Duplicate</span></button>
       <button class="ibtn" id="delBtn" title="Delete (Del)"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg><span class="hide-sm">Delete</span></button>
       <div class="div hide-mob"></div>
+      <button class="ibtn autob hide-mob" id="autoBtn" title="Make a highlights video automatically"><svg viewBox="0 0 24 24"><path d="m12 3 1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/></svg><span>Auto edit</span></button>
       <button class="ibtn" id="hlBtn" title="Highlight at playhead (M)"><svg viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg><span class="hide-sm">Highlight</span></button>
       <button class="ibtn hide-mob" id="addTextBtn" title="Add text at playhead"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg><span class="hide-sm">Text</span></button>
       <button class="ibtn" id="importBtn2" title="Import media"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span class="hide-sm">Import</span></button>
@@ -449,10 +463,17 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
     <button data-m="marks"><svg viewBox="0 0 24 24"><path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/></svg>Marks</button>
     <button data-m="text"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg>Text</button>
     <button data-m="edit"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Edit</button>
+    <button data-m="auto" class="mauto"><svg viewBox="0 0 24 24"><path d="m12 3 1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/></svg>Auto</button>
     <button data-m="split"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg>Split</button>
   </nav>
 </div>
 
+<div class="scrim" id="autoModal" hidden>
+  <div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="autoH">
+    <div class="mhead"><h2 id="autoH"><svg style="width:20px;height:20px;color:var(--cue)" viewBox="0 0 24 24"><path d="m12 3 1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/></svg> Auto edit</h2><div class="sp"></div><button class="ibtn" data-autoclose aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div id="autoBody" style="display:grid;gap:14px"></div>
+  </div>
+</div>
 <div class="scrim" id="exportModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="exH">
     <h2 id="exH">Export video</h2>
@@ -543,6 +564,7 @@ const ICON={
   copy:'<svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
   trash:'<svg viewBox="0 0 24 24"><path d="M4 7h10M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
   upload:'<svg viewBox="0 0 24 24"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 20h16"/></svg>',
+  spark:'<svg viewBox="0 0 24 24"><path d="m12 3 1.8 4.6L18 9l-4.2 1.4L12 15l-1.8-4.6L6 9l4.2-1.4z"/><path d="M19 15l.7 1.8 1.8.7-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/></svg>',
   play:'<path d="M8 5v14l11-7z"/>', pause:'<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>'
 };
 
@@ -1459,6 +1481,8 @@ async function importFiles(files){
   const added=[];
   for(const m of ok){ added.push(addMedia(m,false)); await persistMedia(m); }
   if(added.length && dbOK && !askedPersist && navigator.storage && navigator.storage.persist){ askedPersist=true; navigator.storage.persist().catch(()=>{}); }
+  if(pendingAutoSong){ pendingAutoSong=false; const a=ok.filter(m=>m.kind==='audio').pop(); if(a) AUTO.music=a.id; }
+  if(added.length && !$('#autoModal').hidden) setTimeout(openAuto,50);
   if(added.length){ sel=added[added.length-1]; commit(); renderAll(); renderBin(); toast(`Added ${added.length} item${added.length>1?'s':''} to the timeline`); }
 }
 $('#file').addEventListener('change',e=>{ importFiles([...e.target.files]); e.target.value=''; });
@@ -1495,6 +1519,7 @@ function renderBin(){
   const items=sortedMedia();
   $('#leftBody').innerHTML=`
     <div class="drop"><div><b>Drop files here</b> or</div><div class="dropbtns"><button class="btn primary" id="importBtn">${ICON.upload}Import media</button><button class="btn" id="musicBtn">${ICON.music}Add music</button></div><div class="note">Video, photos and audio stay on this device. Use <b>Add music</b> for songs in your Downloads or Files.</div></div>
+    ${items.filter(m=>!m.sample&&m.kind!=='audio').length?`<button class="btn wide-btn autocard" id="autoCard">${ICON.spark}Auto edit my video</button>`:''}
     <div class="binhead"><p class="h6">Media · ${items.length}</p>
       <label class="sortsel"><span>Sort</span><select id="binSort" aria-label="Sort media">
         <option value="taken"${binSort==='taken'?' selected':''}>Date taken</option>
@@ -1506,13 +1531,13 @@ function renderBin(){
         <div class="th" style="${m.kind!=='audio'&&m.thumb?`background-image:url(${m.thumb})`:''}">${m.kind==='audio'?(m.wave?`<div class="wave" style="background-image:url(${m.wave})"></div>`:ICON.music):(!m.thumb?ICON.film:'')}
           <span class="kind">${m.kind}</span>
           <button class="add" data-add="${m.id}" aria-label="Add ${esc(m.name)} to timeline">${ICON.plus}</button>
-          ${m.sample?'<span class="chip-s">Sample</span>':''}</div>
+          ${m.sample?'<span class="chip-s">Sample</span>':''}${m.pixabay?`<span class="chip-s px" title="By ${esc(m.credit||'')} on Pixabay">Pixabay</span>`:''}</div>
         <div class="meta">
           <div class="nmrow"><span class="nm">${esc(m.name)}</span><button class="ren" data-ren="${m.id}" title="Rename" aria-label="Rename ${esc(m.name)}"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg></button></div>
           <div class="sub"><span${m.takenSrc?` title="Date ${TAKEN_SRC[m.takenSrc]}"`:''}>${m.taken?fmtTaken(m.taken):m.sample?'Sample':'No date'}</span>${m.kind==='image'?'':`<span class="du">${fmtD(m.dur)}</span>`}</div>
         </div>
       </div>`).join('')}</div>`;
-  $('#importBtn').onclick=openPicker; $('#musicBtn').onclick=openMusic;
+  $('#importBtn').onclick=openPicker; $('#musicBtn').onclick=openMusic; const ac=$('#autoCard'); if(ac) ac.onclick=openAuto;
   $('#binSort').onchange=e=>{ binSort=e.target.value; try{localStorage.setItem('splice.binSort',binSort)}catch(x){} renderBin(); };
   const ob=$('#orderTL'); if(ob) ob.onclick=orderTimelineByDate;
 }
@@ -1876,6 +1901,7 @@ document.querySelectorAll('[data-close]').forEach(b=>b.onclick=closeSheets);
 $('#mbar').addEventListener('click',e=>{
   const b=e.target.closest('[data-m]'); if(!b) return; const m=b.dataset.m;
   if(m==='split'){ splitAt(); return; }
+  if(m==='auto'){ openAuto(); return; }
   if(b.classList.contains('on')){ closeSheets(); return; }
   if(m==='media'||m==='text'||m==='styles'||m==='marks'){ ltab=m; renderLeft(); }
   openSheet(m);
@@ -1910,7 +1936,7 @@ window.addEventListener('keydown',e=>{
   else if(!mod && e.key.toLowerCase()==='o'){ setHlEdge('out'); }
   else if(e.key===']'){ jumpHighlight(1); }
   else if(e.key==='['){ jumpHighlight(-1); }
-  else if(e.key==='Escape'){ if(!$('#projModal').hidden){ closeProjects(); return; } select(null); closeSheets(); }
+  else if(e.key==='Escape'){ if(!$('#projModal').hidden){ closeProjects(); return; } if(!$('#autoModal').hidden && !$('#autoStop')){ $('#autoModal').hidden=true; return; } select(null); closeSheets(); }
 });
 let toastT=0;
 function toast(msg){ let t=document.querySelector('.toast'); if(!t){ t=document.createElement('div'); t.className='toast'; t.setAttribute('role','status'); document.body.appendChild(t);} t.textContent=msg; clearTimeout(toastT); toastT=setTimeout(()=>t.remove(),2400); }
@@ -2013,7 +2039,7 @@ function setSaveState(s){ const el=$('#saveSt'); if(el){ el.textContent=s; el.da
 function persistMedia(m){
   if(!dbOK||!m.blob) return Promise.resolve();
   return DB.put('media',{id:m.id,name:m.name,kind:m.kind,blob:m.blob,dur:isFinite(m.dur)?m.dur:null,w:m.w,h:m.h,sample:!!m.sample,
-    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null,taken:m.taken||null,takenSrc:m.takenSrc||null,added:m.added||null,rot:m.rot||0,vendChecked:!!m.vendChecked}).catch(()=>toast('Your device is out of storage space for saved media.'));
+    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null,taken:m.taken||null,takenSrc:m.takenSrc||null,added:m.added||null,rot:m.rot||0,vendChecked:!!m.vendChecked,analysis:m.analysis||null,pixabay:!!m.pixabay,credit:m.credit||null,pageURL:m.pageURL||null}).catch(()=>toast('Your device is out of storage space for saved media.'));
 }
 function thumbOf(){ try{ const c=document.createElement('canvas'), k=240/Math.max(W,H); c.width=Math.round(W*k); c.height=Math.round(H*k); c.getContext('2d').drawImage(cv,0,0,c.width,c.height); return c.toDataURL('image/jpeg',.7); }catch(e){ return null; } }
 function scheduleSave(){ if(!dbOK||!curId||loadingProj) return; setSaveState('Saving…'); clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,700); }
@@ -2038,7 +2064,7 @@ async function openProject(id){
   let missing=0;
   for(const mid of rec.mediaIds||[]){
     const mr=await DB.get('media',mid).catch(()=>null); if(!mr||!mr.blob){ missing++; continue; }
-    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave,taken:mr.taken||null,takenSrc:mr.takenSrc||null,added:mr.added||0,rot:mr.rot||0,vendChecked:!!mr.vendChecked};
+    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave,taken:mr.taken||null,takenSrc:mr.takenSrc||null,added:mr.added||0,rot:mr.rot||0,vendChecked:!!mr.vendChecked,analysis:mr.analysis||null,pixabay:!!mr.pixabay,credit:mr.credit||null,pageURL:mr.pageURL||null};
     try{
       if(m.kind==='image'){ const img=new Image(); img.src=m.url; await img.decode(); m.img=img; m.w=img.naturalWidth; m.h=img.naturalHeight; m.thumb=m.url; m.dur=Infinity; }
       else if(m.kind==='video' && !m.strip) makeStrip(m).then(()=>persistMedia(m));
@@ -2107,6 +2133,337 @@ $('#projModal').addEventListener('click',async e=>{
 $('#projName').addEventListener('input',scheduleSave);
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') saveNow(); });
 window.addEventListener('pagehide',()=>saveNow());
+
+/* ======================= AUTO EDIT =======================
+   Everything runs on this device. For each video it plays through (muted, fast) sampling a tiny frame 5× a second:
+   movement, sharpness, brightness, colour, and scene changes; plus loudness from the soundtrack. Each second gets a
+   score; peaks become moments, cut around the action and bounded by scene changes. Moments are ordered by when they
+   were shot, B-roll is woven between them, and if there's a song every cut lands on its beat. */
+const PACE={relaxed:{name:'Relaxed',len:5,min:3,max:7.5,every:3,cut:'fade',mood:'acoustic'},
+            balanced:{name:'Balanced',len:3.2,min:2,max:5,every:3,cut:'none',mood:'upbeat'},
+            fast:{name:'Fast',len:1.9,min:1.1,max:3,every:4,cut:'none',mood:'energetic sport'}};
+const AUTO={pace:'balanced',len:60,music:'',broll:true,px:false,pxQ:'',title:true,style:'keep',marks:true};
+try{ const s=JSON.parse(localStorage.getItem('splice.auto')||'{}'); Object.assign(AUTO,s); }catch(e){}
+const pxKey=()=>{ try{ return localStorage.getItem('splice.pxkey')||''; }catch(e){ return ''; } };
+let autoRun=null;
+
+function userMedia(kind){ return Object.values(media).filter(m=>m.kind===kind && !m.sample); }
+function footageSecs(){ return userMedia('video').reduce((a,m)=>a+(isFinite(m.dur)?m.dur:0),0); }
+
+/* ---- 1. look at a video ---- */
+async function analyseVideoMedia(m,onProg,run){
+  if(m.analysis && m.analysis.v===1 && Math.abs(m.analysis.dur-m.dur)<.5) return m.analysis;
+  const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.setAttribute('playsinline',''); v.preload='auto'; v.src=m.url;
+  v.style.cssText='position:fixed;left:0;top:0;width:4px;height:4px;opacity:.01;pointer-events:none'; document.body.appendChild(v);
+  const S=[]; let prev=null;
+  try{
+    await waitEvt(v,'loadeddata','error',15000);
+    const dur=m.dur, sw=v.videoWidth||16, sh=v.videoHeight||9, w=64, h=Math.max(8,Math.round(64*sh/sw));
+    const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d',{willReadFrequently:true});
+    const grab=t=>{
+      g.drawImage(v,0,0,w,h); const d=g.getImageData(0,0,w,h).data, Y=new Float32Array(w*h);
+      let ys=0, sat=0, sharp=0, diff=0;
+      for(let i=0,j=0;i<d.length;i+=4,j++){ const r=d[i],gg=d[i+1],b=d[i+2]; const y=.299*r+.587*gg+.114*b; Y[j]=y; ys+=y; const mx=Math.max(r,gg,b), mn=Math.min(r,gg,b); sat+=mx?(mx-mn)/mx:0; }
+      for(let yy=0;yy<h-1;yy++) for(let x=0;x<w-1;x++){ const j=yy*w+x; sharp+=Math.abs(Y[j+1]-Y[j])+Math.abs(Y[j+w]-Y[j]); }
+      if(prev){ for(let j=0;j<Y.length;j++) diff+=Math.abs(Y[j]-prev[j]); diff/=Y.length; }
+      prev=Y; S.push({t,y:ys/Y.length/255,sat:sat/Y.length,sharp:sharp/((w-1)*(h-1))/255,diff:diff/255});
+    };
+    const useRVFC='requestVideoFrameCallback' in HTMLVideoElement.prototype;
+    let done=false;
+    if(useRVFC){
+      try{ v.playbackRate=4; }catch(e){}
+      await new Promise(res=>{
+        let last=-1, watchdog=null; const finish=()=>{ if(done) return; done=true; clearTimeout(watchdog); v.pause(); res(); };
+        const arm=()=>{ clearTimeout(watchdog); watchdog=setTimeout(finish,5000); };
+        const cb=(now,meta)=>{ if(run.cancel) return finish(); const t=meta.mediaTime;
+          if(t-last>=.2){ grab(t); last=t; onProg(Math.min(1,t/dur)); }
+          if(t>=dur-.1) return finish(); arm(); v.requestVideoFrameCallback(cb); };
+        v.addEventListener('ended',finish,{once:true});
+        v.requestVideoFrameCallback(cb); arm(); v.play().catch(()=>finish());
+      });
+    }
+    // no frame callbacks (or playback stalled): step through by seeking instead
+    const lastT=S.length?S[S.length-1].t:-1;
+    if(!useRVFC || lastT<dur-1.5){
+      prev=null; if(lastT>0 && S.length) prev=null;
+      for(let t=Math.max(0,lastT+.5);t<dur-.05;t+=.5){ if(run.cancel) break; v.currentTime=t; await waitEvt(v,'seeked','error',6000).catch(()=>{}); grab(t); onProg(t/dur); }
+    }
+  }finally{ v.removeAttribute('src'); v.load(); v.remove(); }
+  if(run.cancel) return null;
+  // loudness from the soundtrack (skipped for very large files to spare the phone's memory)
+  let loud=null;
+  if(m.blob && m.blob.size<160e6){
+    try{ const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; const ab=await new OAC(1,44100,44100).decodeAudioData(await m.blob.arrayBuffer());
+      const ch=ab.getChannelData(0), sr=ab.sampleRate, N=Math.ceil(m.dur); loud=new Array(N).fill(0);
+      for(let s=0;s<N;s++){ const a=Math.floor(s*sr), b=Math.min(ch.length,Math.floor((s+1)*sr)); let pk=0;
+        for(let i=a;i<b;i+=Math.floor(sr/20)){ let sum=0; const e=Math.min(b,i+Math.floor(sr/20)); for(let k=i;k<e;k+=4) sum+=ch[k]*ch[k]; pk=Math.max(pk,Math.sqrt(sum/Math.max(1,(e-i)/4))); }
+        loud[s]=pk; }
+    }catch(e){ loud=null; }
+  }
+  // per-second summary + scene changes
+  const N=Math.max(1,Math.ceil(m.dur)), A={v:1,dur:m.dur,motion:[],sharp:[],bright:[],sat:[],loud,cuts:[]};
+  const diffs=S.map(s=>s.diff).filter(x=>x>0).sort((a,b)=>a-b), med=diffs[Math.floor(diffs.length/2)]||.01;
+  for(let s=0;s<N;s++){ const inS=S.filter(x=>x.t>=s&&x.t<s+1); const avg=k=>inS.length?inS.reduce((a,x)=>a+x[k],0)/inS.length:0;
+    A.motion.push(avg('diff')); A.sharp.push(avg('sharp')); A.bright.push(avg('y')); A.sat.push(avg('sat')); }
+  S.forEach(x=>{ if(x.diff>Math.max(.12,med*6)) A.cuts.push(+x.t.toFixed(2)); });
+  m.analysis=A; persistMedia(m); return A;
+}
+
+/* ---- 2. find the beat of the song ---- */
+async function analyseMusic(m){
+  if(m._beats) return m._beats;
+  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  const ab=await new OAC(1,44100,44100).decodeAudioData(await m.blob.arrayBuffer());
+  const ch=ab.getChannelData(0), sr=ab.sampleRate, hop=512, n=Math.floor(ch.length/hop), fps=sr/hop;
+  const e=new Float32Array(n); for(let i=0;i<n;i++){ let s=0; for(let k=i*hop;k<(i+1)*hop;k+=2) s+=ch[k]*ch[k]; e[i]=Math.log(1+1000*s); }
+  const o=new Float32Array(n); for(let i=1;i<n;i++) o[i]=Math.max(0,e[i]-e[i-1]);
+  const lo=Math.floor(fps*60/170), hi=Math.ceil(fps*60/72); let best=lo, bv=-1;
+  for(let l=lo;l<=hi;l++){ let s=0; for(let i=0;i+l<n;i++) s+=o[i]*o[i+l]; const bpm=60*fps/l; s*=1+.12*Math.exp(-Math.pow((bpm-118)/28,2)); if(s>bv){bv=s;best=l;} }
+  let ph=0, pv=-1; for(let p=0;p<best;p++){ let s=0; for(let i=p;i<n;i+=best) s+=o[i]; if(s>pv){pv=s;ph=p;} }
+  const period=best/fps, beats=[]; for(let t=ph/fps;t<ab.duration;t+=period) beats.push(t);
+  return m._beats={bpm:Math.round(60/period),beats,dur:ab.duration,period};
+}
+
+/* ---- 3. B-roll from Pixabay (needs the viewer's own free API key) ---- */
+async function pixabayBroll(key,q,n,onStep){
+  const cacheKey='splice.px.'+q.toLowerCase(); let j=null;
+  try{ const c=JSON.parse(localStorage.getItem(cacheKey)||'null'); if(c && Date.now()-c.at<864e5) j=c.j; }catch(e){}   // Pixabay asks for 24 h caching
+  if(!j){
+    const r=await fetch(`https://pixabay.com/api/videos/?key=${encodeURIComponent(key)}&q=${encodeURIComponent(q)}&per_page=20&safesearch=true&video_type=film`);
+    if(r.status===400||r.status===401||r.status===403) throw new Error('key'); if(!r.ok) throw new Error('http');
+    j=await r.json(); try{ localStorage.setItem(cacheKey,JSON.stringify({at:Date.now(),j})); }catch(e){}
+  }
+  const hits=(j.hits||[]).filter(h=>h.duration>=4 && h.videos).slice(0,n), out=[];
+  for(const h of hits){
+    onStep(`Downloading B-roll ${out.length+1} of ${hits.length}`);
+    const f=(h.videos.small&&h.videos.small.url)?h.videos.small:h.videos.tiny; if(!f||!f.url) continue;
+    const b=await (await fetch(f.url)).blob();
+    const tag=(h.tags||'b-roll').split(',')[0].trim();
+    const m={id:uid(),name:`Pixabay · ${tag}`,kind:'video',url:URL.createObjectURL(b),blob:b,added:Date.now(),pixabay:true,credit:h.user,pageURL:h.pageURL};
+    try{ await probe(m); }catch(e){ continue; }
+    media[m.id]=m; await persistMedia(m); out.push(m);
+  }
+  return out;
+}
+
+/* ---- 4. choose the moments ---- */
+function pctFn(values){ const s=values.filter(x=>x!=null&&isFinite(x)).sort((a,b)=>a-b); return x=>{ if(!s.length) return .5; let lo=0,hi=s.length; while(lo<hi){ const mid=(lo+hi)>>1; if(s[mid]<x) lo=mid+1; else hi=mid; } return lo/s.length; }; }
+// how far above normal a value is (0 = typical, 1 = among the strongest), so near-identical quiet seconds don't rank as "interesting"
+function salFn(values){ const s=values.filter(x=>x!=null&&isFinite(x)).sort((a,b)=>a-b); if(!s.length) return ()=>0;
+  const p50=s[Math.floor(s.length*.5)], p95=s[Math.min(s.length-1,Math.floor(s.length*.95))]; return x=>clamp((x-p50)/Math.max(1e-6,p95-p50),0,1); }
+function scoreVideos(vids){
+  const all=k=>vids.flatMap(m=>(m.analysis&&m.analysis[k])||[]);
+  const Pm=pctFn(all('motion')), Ps=pctFn(all('sharp')), Pc=pctFn(all('sat')), Pl=pctFn(vids.flatMap(m=>m.analysis.loud||[]));
+  const Sm=salFn(all('motion')), Sl=salFn(vids.flatMap(m=>m.analysis.loud||[]));
+  for(const m of vids){ const A=m.analysis, N=A.motion.length, sc=[];
+    for(let i=0;i<N;i++){
+      const pm=Pm(A.motion[i]), ps=Ps(A.sharp[i]), pc=Pc(A.sat[i]), b=A.bright[i];
+      let s=A.loud? .45*pm+.3*Pl(A.loud[i])+.15*ps+.1*pc : .6*pm+.25*ps+.15*pc;
+      if(b<.1||b>.95) s-=.4; if(ps<.1) s-=.25; if(pm>.97&&ps<.3) s-=.2; if(i===0) s-=.15;
+      sc.push(s); }
+    A.score=sc.map((x,i)=>(( sc[i-1]??x)+2*x+(sc[i+1]??x))/4);
+    // how much is actually happening: movement or sound clearly above this footage's norm
+    const it=i=>Math.max(Sm(A.motion[i]),A.loud?Sl(A.loud[i]):0);
+    A.interest=A.motion.map((x,i)=>((i>0?it(i-1):it(i))+2*it(i)+(i<N-1?it(i+1):it(i)))/4);
+    A.calm=A.motion.map((x,i)=>{ const pm=Pm(x), ps=Ps(A.sharp[i]), b=A.bright[i]; return (b>.15&&b<.9)? (1-pm)*.5+ps*.5 : 0; });
+  }
+}
+function pickMoments(vids,budget,pace,must){
+  // only real moments make the cut: clearly above-average action or sound. Better a shorter video than filler.
+  const allS=vids.flatMap(m=>m.analysis.score).sort((a,b)=>a-b), floor=Math.max(.3,allS[Math.floor(allS.length*.6)]||0);
+  const cands=[];
+  for(const m of vids){ const A=m.analysis, sc=A.score, N=sc.length;
+    for(let i=0;i<N;i++){ let peak=true; for(let k=-2;k<=2;k++) if(k&&sc[i+k]!=null&&sc[i+k]>sc[i]) peak=false;
+      if(peak && sc[i]>=floor && A.interest[i]>=.3) cands.push({m,i,s:sc[i]}); } }
+  if(!cands.length) for(const m of vids){ const sc=m.analysis.score; let bi=0; sc.forEach((x,i)=>{ if(x>sc[bi]) bi=i; }); cands.push({m,i:bi,s:sc[bi]}); }  // nothing stands out: take each video's best
+  const segOf=c=>{ const A=c.m.analysis, L=clamp(pace.len*(.8+.5*clamp(c.s,0,1)),pace.min,pace.max), pk=c.i+.5;
+    let a=Math.max(.15,pk-.6*L), b=Math.min(c.m.dur-.05,a+L); a=Math.max(0,b-L);
+    for(const ct of A.cuts){ if(ct>a&&ct<=pk) a=ct+.05; if(ct>pk&&ct<b) b=ct-.05; }
+    return b-a>=pace.min*.75?{m:c.m,a,b,s:c.s}:null; };
+  const chosen=[...must], overlaps=x=>chosen.some(y=>y.m===x.m && x.a<y.b+.75 && x.b>y.a-.75);
+  let total=chosen.reduce((t,x)=>t+(x.b-x.a),0);
+  const byVid=new Map(); cands.forEach(c=>{ if(!byVid.has(c.m)||byVid.get(c.m).s<c.s) byVid.set(c.m,c); });
+  for(const c of [...byVid.values()].sort((a,b)=>b.s-a.s)){ if(total>=budget) break; const x=segOf(c); if(x&&!overlaps(x)){ chosen.push(x); total+=x.b-x.a; } }  // every video gets its best moment
+  for(const c of cands.sort((a,b)=>b.s-a.s)){ if(total>=budget) break; const x=segOf(c); if(x&&!overlaps(x)){ chosen.push(x); total+=x.b-x.a; } }
+  const when=m=>m.taken||m.added||0;
+  return chosen.sort((x,y)=>(when(x.m)-when(y.m))||(x.m===y.m?x.a-y.a:0));
+}
+function calmShots(vids,chosen,n){
+  const out=[];
+  for(const m of vids){ const A=m.analysis; if(!A||!A.calm) continue;
+    for(let i=1;i<A.calm.length-2;i++){ const a=i, b=Math.min(m.dur-.05,i+2.6);
+      if(A.calm[i]>.62 && !chosen.some(y=>y.m===m&&a<y.b+1.5&&b>y.a-1.5) && !A.cuts.some(c=>c>a&&c<b)) out.push({m,a,b,s:A.calm[i],broll:true}); } }
+  const picked=[]; for(const c of out.sort((x,y)=>y.s-x.s)){ if(picked.length>=n) break; if(!picked.some(p=>p.m===c.m&&Math.abs(p.a-c.a)<6)) picked.push(c); }
+  return picked;
+}
+
+/* ---- 5. put it together ---- */
+async function buildAutoEdit(opts,ui){
+  const run={cancel:false}; autoRun=run;
+  const pace=PACE[opts.pace]||PACE.balanced;
+  const vids=userMedia('video').filter(m=>!m.pixabay), photos=userMedia('image');
+  if(!vids.length && !photos.length) throw new Error('nomedia');
+  // how long?
+  let target=Math.min(300,opts.len);
+  let song=opts.music?media[opts.music]:null, beat=null;
+  if(song){ ui.step('Finding the beat of your song'); try{ beat=await analyseMusic(song); }catch(e){ beat=null; }
+    if(beat && beat.dur>=20) target=Math.min(target,beat.dur); }
+  // look at every video
+  const totalSecs=vids.reduce((a,m)=>a+m.dur,0)||1; let doneSecs=0;
+  for(const [i,m] of vids.entries()){
+    ui.step(`Watching video ${i+1} of ${vids.length}: ${m.name}`);
+    await analyseVideoMedia(m,f=>ui.prog(.08+.72*(doneSecs+f*m.dur)/totalSecs),run);
+    if(run.cancel) return null; doneSecs+=m.dur;
+  }
+  ui.prog(.82);
+  // B-roll
+  let pxClips=[];
+  if(opts.px && pxKey() && opts.pxQ.trim()){
+    ui.step('Fetching B-roll from Pixabay');
+    try{ pxClips=await pixabayBroll(pxKey(),opts.pxQ.trim(),Math.min(4,Math.max(2,Math.round(target/40))),s=>ui.step(s)); }
+    catch(e){ ui.note(e.message==='key'?'Pixabay didn’t accept the API key, so no Pixabay B-roll was added.':'Pixabay couldn’t be reached from here, so no Pixabay B-roll was added. It works in your GitHub version.'); }
+    for(const m of pxClips) m.analysis=null;
+  }
+  if(run.cancel) return null;
+  ui.step('Choosing the best moments'); ui.prog(.9);
+  const vidsOK=vids.filter(m=>m.analysis);
+  if(vidsOK.length) scoreVideos(vidsOK);
+  // your own highlights (Marks) are always kept
+  const must=[];
+  if(opts.marks) for(const h of P.marks||[]){ const c=P.clips.find(x=>x.id===h.clipId), m=c&&media[c.mediaId]; if(m&&m.kind==='video'&&vidsOK.includes(m)&&h.out-h.in>.4) must.push({m,a:h.in,b:h.out,s:1,must:true}); }
+  const wantBroll=opts.broll||pxClips.length;
+  const brollShare=wantBroll?.18:0;
+  const title=opts.title?Math.min(3,pace.len):0;
+  let moments=vidsOK.length?pickMoments(vidsOK,Math.max(pace.len,(target-title)*(1-brollShare)),pace,must):[];
+  // B-roll pool: Pixabay clips, then your photos, then calm, steady shots from your own videos
+  const pool=[];
+  pxClips.forEach(m=>pool.push({m,a:Math.min(1,m.dur*.2),b:Math.min(m.dur-.05,Math.min(1,m.dur*.2)+3.2),broll:true}));
+  if(opts.broll){ photos.sort((a,b)=>(a.taken||a.added||0)-(b.taken||b.added||0)).forEach(m=>pool.push({m,a:0,b:2.6,broll:true,photo:true}));
+    if(vidsOK.length) calmShots(vidsOK,moments,3).forEach(x=>pool.push(x)); }
+  if(!vidsOK.length) photos.forEach(m=>{ if(!pool.some(p=>p.m===m)) pool.push({m,a:0,b:pace.len,broll:false,photo:true}); });
+  // sequence: an opener, then moments with B-roll woven in
+  const seq=[];
+  if(vidsOK.length){
+    if(pool.length) seq.push(pool.shift());
+    moments.forEach((x,i)=>{ seq.push(x); if(pool.length && (i+1)%pace.every===0 && i<moments.length-1) seq.push(pool.shift()); });
+    if(pool.length && seq.length>3) seq.push(pool.shift());
+  } else { pool.forEach(x=>seq.push({...x,broll:false})); }
+  // trim to the target (keep the must-haves), longest-first
+  let len=()=>seq.reduce((t,x)=>t+(x.b-x.a),0);
+  while(len()>target && seq.length>2){ let k=-1, kl=0; seq.forEach((x,i)=>{ if(!x.must && x.b-x.a>kl){ kl=x.b-x.a; k=i; } });
+    const x=seq[k], over=len()-target; if(x.b-x.a-over>=pace.min){ x.b-=over; break; } seq.splice(k,1); }
+  // snap each cut to the nearest beat
+  if(beat){ let t=0; for(const x of seq){ const L=x.b-x.a, maxL=x.photo?L*1.6:Math.min(x.m.dur-.05-x.a,L*1.35)+0, minL=Math.max(.8,L*.6);
+      let bestB=null, bd=1e9; for(const bt of beat.beats){ const d=bt-t; if(d<minL) continue; if(d>maxL) break; if(Math.abs(d-L)<bd){ bd=Math.abs(d-L); bestB=bt; } }
+      if(bestB!=null){ x.b=x.a+(bestB-t); } t+=x.b-x.a; } }
+  if(run.cancel) return null;
+  // ---- write it as a new project ----
+  ui.step('Assembling your video'); ui.prog(.96);
+  const baseName=($('#projName').value||'My video').replace(/ · Auto edit$/,'');
+  const keep={aspect:P.aspect,bg:P.bg,style:P.style,amt:P.amt,warm:P.warm,letterbox:P.letterbox};
+  const curFilter=(P.clips[0]&&P.clips[0].filter)||'none';
+  const st=opts.style!=='keep'?STYLES.find(s=>s.id===opts.style):null;
+  await saveNow(); const origId=curId;
+  curId=uid(); curCreated=Date.now(); $('#projName').value=baseName+' · Auto edit'; hist=[]; hi=-1; sel=null;
+  const clips=[]; let pi=0;
+  seq.forEach((x,i)=>{
+    const c=newClip(x.m); c.in=x.a; c.out=x.photo?x.a+(x.b-x.a):x.b; if(x.photo){ c.in=0; c.out=x.b-x.a; c.motion=pi++%2?'zoomOut':'zoomIn'; }
+    c.volume=x.broll?0:(song?.35:1); c.filter=st?st.filter:curFilter;
+    const next=seq[i+1]; const soft=x.broll||(next&&next.broll)||pace.cut==='fade';
+    // straight cuts between action moments (on the beat); a softer transition into and out of B-roll
+    const softType=st&&st.tr&&st.tr!=='none'?st.tr:'fade';
+    c.tr= next? (soft? {type:softType,dur:.5} : {type:'none',dur:.35}) : {type:'none',dur:.5};
+    clips.push(c);
+  });
+  P={...keep,clips,texts:[],audio:[],marks:[]};
+  if(st){ P.style=st.id; P.letterbox=!!st.letterbox; P.amt=100; }
+  layout(); const vlen=videoEnd();
+  if(opts.title){
+    const dates=seq.map(x=>x.m.taken).filter(Boolean).sort((a,b)=>a-b);
+    P.texts.push({id:uid(),text:baseName.toUpperCase(),start:.25,dur:Math.min(3.2,Math.max(1.5,vlen-.3)),x:.5,y:.42,size:96,color:'#ffffff',font:'anton',style:'shadow',bg:'#000000',anim:'pop',italic:false});
+    if(dates.length) P.texts.push({id:uid(),text:new Date(dates[0]).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'}).toUpperCase(),start:.7,dur:Math.min(2.8,Math.max(1,vlen-.8)),x:.5,y:.56,size:30,color:'#111111',font:'mono',style:'box',bg:'#f2c14e',anim:'type',italic:false});
+  }
+  if(song){ const d=Math.min(song.dur,vlen); P.audio.push({id:uid(),mediaId:song.id,start:0,in:0,out:d,volume:.9,fadeIn:.4,fadeOut:Math.min(3,d/4)}); }
+  T=0; applyAspect(false); commit(); await saveNow(); renderAll(); renderLeft(); requestAnimationFrame(()=>fitZoom());
+  const usedVids=new Set(seq.filter(x=>!x.broll&&!x.photo).map(x=>x.m.id)).size;
+  return {len:vlen, moments:seq.filter(x=>!x.broll).length, videos:usedVids, broll:seq.filter(x=>x.broll).length, px:pxClips, song:song?song.name:null, bpm:beat?beat.bpm:null, origId,
+          footage:Math.round(totalSecs)};
+}
+
+/* ---- the Auto edit screen ---- */
+function openAuto(){
+  setPlaying(false); closeSheets();
+  const vids=userMedia('video').filter(m=>!m.pixabay), photos=userMedia('image'), songs=userMedia('audio');
+  if(AUTO.music && !media[AUTO.music]) AUTO.music='';
+  if(!AUTO.music && songs.length) AUTO.music=songs[0].id;
+  const foot=footageSecs(), suggest=[30,60,120,180,300].find(x=>x>=Math.min(300,foot*.25))||300;
+  if(!AUTO._touched) AUTO.len=Math.min(suggest,300);
+  const pace=PACE[AUTO.pace], mood=encodeURIComponent(pace.mood);
+  const hasKey=!!pxKey();
+  $('#autoBody').innerHTML=`
+    ${vids.length||photos.length?'':'<!--none-->'}<p class="note" style="margin:0${!vids.length&&!photos.length?';display:none':''}">Uses the ${vids.length} video${vids.length===1?'':'s'}${photos.length?` and ${photos.length} photo${photos.length===1?'':'s'}`:''} in this project${foot?` (${fmtD(foot)} of footage)`:''}. It picks the best moments, cuts them to your song and adds B-roll. Your current edit stays as it is; the result opens as a new project.</p>
+    ${!vids.length&&!photos.length?'<p class="note" style="color:#ff8a8d;margin:0">Import your videos or photos first, then come back here.</p>':''}
+    ${field('Length',`<div class="chips">${[[30,'30 s'],[60,'1 min'],[120,'2 min'],[180,'3 min'],[300,'5 min']].map(([v,n])=>`<button class="chip${AUTO.len===v?' on':''}" data-al="${v}">${n}</button>`).join('')}</div><p class="note" style="margin:6px 0 0">Maximum. It will be shorter if there isn’t enough good footage, or if your song ends first.</p>`)}
+    ${field('Pace',`<div class="chips">${Object.entries(PACE).map(([k,p])=>`<button class="chip${AUTO.pace===k?' on':''}" data-ap="${k}">${p.name}</button>`).join('')}</div>`)}
+    ${field('Music',`<select id="autoMusic" class="lblin"><option value="">No music (keep the original sound)</option>${songs.map(s=>`<option value="${s.id}"${AUTO.music===s.id?' selected':''}>${esc(s.name)}</option>`).join('')}</select>
+      <div class="autolinks"><button class="btn" id="autoAddSong">${ICON.music}Add a song</button><a class="btn ghost" href="https://pixabay.com/music/search/${mood}/" target="_blank" rel="noopener">Find ${esc(pace.mood)} songs on Pixabay ↗</a></div>
+      <p class="note" style="margin:6px 0 0">Pixabay doesn’t let apps fetch its music, so download a song there, then tap <b>Add a song</b>. Cuts will land on its beat.</p>`)}
+    ${field('B-roll',`<label class="chk"><input type="checkbox" id="autoBroll"${AUTO.broll?' checked':''}> Use my photos and calm, steady shots between moments</label>
+      <label class="chk"><input type="checkbox" id="autoPx"${AUTO.px?' checked':''}> Add B-roll videos from Pixabay</label>
+      <div id="pxBox"${AUTO.px?'':' hidden'} class="pxbox">
+        <input class="lblin" id="autoPxQ" placeholder="What to search for, e.g. soccer stadium" value="${esc(AUTO.pxQ)}" maxlength="60">
+        <input class="lblin" id="autoPxKey" placeholder="Your free Pixabay API key" value="${esc(pxKey())}" autocomplete="off" spellcheck="false">
+        <p class="note" style="margin:0">${hasKey?'Key saved on this device only.':'Get a free key: sign in at Pixabay and open'} <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">pixabay.com/api/docs</a>${hasKey?'':'. It’s shown near the top as “key”. Saved on this device only.'}</p></div>`)}
+    ${field('Extras',`<label class="chk"><input type="checkbox" id="autoTitle"${AUTO.title?' checked':''}> Opening title using the project name</label>
+      ${(P.marks||[]).length?`<label class="chk"><input type="checkbox" id="autoMarks"${AUTO.marks?' checked':''}> Always include my ${P.marks.length} highlight${P.marks.length===1?'':'s'}</label>`:''}
+      <select id="autoStyle" class="lblin"><option value="keep">Keep this project’s look</option>${STYLES.map(s=>`<option value="${s.id}"${AUTO.style===s.id?' selected':''}>Style: ${s.name}</option>`).join('')}</select>`)}
+    <div class="mfoot"><button class="btn ghost" data-autoclose>Cancel</button><button class="btn primary" id="autoGo"${!vids.length&&!photos.length?' disabled':''}>${ICON.spark}Create my video</button></div>`;
+  $('#autoModal').hidden=false;
+}
+function readAutoForm(){
+  const q=id=>document.getElementById(id);
+  AUTO.music=q('autoMusic')?q('autoMusic').value:''; AUTO.broll=!!(q('autoBroll')&&q('autoBroll').checked); AUTO.px=!!(q('autoPx')&&q('autoPx').checked);
+  AUTO.pxQ=q('autoPxQ')?q('autoPxQ').value:AUTO.pxQ; AUTO.title=!!(q('autoTitle')&&q('autoTitle').checked); AUTO.marks=q('autoMarks')?q('autoMarks').checked:AUTO.marks;
+  AUTO.style=q('autoStyle')?q('autoStyle').value:'keep';
+  const k=q('autoPxKey'); if(k){ try{ const v=k.value.trim(); v?localStorage.setItem('splice.pxkey',v):localStorage.removeItem('splice.pxkey'); }catch(e){} }
+  try{ const {_touched,...s}=AUTO; localStorage.setItem('splice.auto',JSON.stringify(s)); }catch(e){}
+}
+async function startAuto(){
+  readAutoForm();
+  if(AUTO.px && (!pxKey()||!AUTO.pxQ.trim())){ toast('Add a Pixabay key and a search word, or untick Pixabay B-roll'); return; }
+  const notes=[];
+  $('#autoBody').innerHTML=`<div style="display:grid;gap:12px"><div class="bar"><i id="autoBar"></i></div><div class="stat"><span id="autoStep">Getting ready</span><b id="autoPct">0%</b></div>
+    <p class="note" style="margin:0">Everything happens on this device. Longer footage takes longer: about a quarter of its running time. Keep this screen open.</p>
+    <div class="mfoot"><button class="btn ghost" id="autoStop">Stop</button></div></div>`;
+  $('#autoStop').onclick=()=>{ if(autoRun) autoRun.cancel=true; };
+  const ui={step:s=>{ const e=$('#autoStep'); if(e) e.textContent=s; }, prog:f=>{ const b=$('#autoBar'), p=$('#autoPct'); if(b) b.style.width=(f*100).toFixed(1)+'%'; if(p) p.textContent=Math.round(f*100)+'%'; }, note:n=>notes.push(n)};
+  let r=null;
+  try{ r=await buildAutoEdit({...AUTO},ui); }
+  catch(e){ console.warn(e); $('#autoBody').innerHTML=`<p class="note">${e.message==='nomedia'?'Import your videos or photos first.':'Something went wrong while making the edit, so nothing was changed. Try again, or try fewer or shorter videos.'}</p><div class="mfoot"><button class="btn" data-autoclose>Close</button></div>`; return; }
+  if(!r){ $('#autoModal').hidden=true; toast('Auto edit stopped. Nothing was changed.'); return; }
+  $('#autoBody').innerHTML=`<div style="display:grid;gap:12px">
+    <p style="margin:0;font:800 17px/1.3 var(--f-brand)">Your ${fmtD(r.len)} video is ready</p>
+    <div class="stat">Best moments<b>${r.moments}${r.videos?` from ${r.videos} video${r.videos===1?'':'s'}`:''}</b></div>
+    ${r.footage?`<div class="stat">From footage<b>${fmtD(r.footage)}</b></div>`:''}
+    <div class="stat">B-roll shots<b>${r.broll}</b></div>
+    <div class="stat">Music<b>${r.song?esc(r.song)+(r.bpm?` · cut to ${r.bpm} BPM`:''):'Original sound'}</b></div>
+    ${r.px.length?`<p class="note" style="margin:0">B-roll from Pixabay by ${[...new Set(r.px.map(m=>m.credit))].map(u=>esc(u)).join(', ')}. <a href="https://pixabay.com/" target="_blank" rel="noopener">pixabay.com</a></p>`:''}
+    ${notes.map(n=>`<p class="note" style="margin:0;color:#ffb070">${esc(n)}</p>`).join('')}
+    <p class="note" style="margin:0">It’s a normal project: trim, reorder or swap anything. Your original is still in Projects.</p>
+    <div class="mfoot"><button class="btn ghost" id="autoBack">Back to my original</button><button class="btn primary" id="autoPlay">Watch it</button></div></div>`;
+  $('#autoBack').onclick=async()=>{ $('#autoModal').hidden=true; await openProject(r.origId); };
+  $('#autoPlay').onclick=()=>{ $('#autoModal').hidden=true; T=0; ensureAudio(); setPlaying(true); };
+}
+$('#autoModal').addEventListener('click',e=>{
+  if(e.target.closest('[data-autoclose]')||e.target===e.currentTarget){ if(!autoRun||autoRun.cancel!==false||!$('#autoStop')) $('#autoModal').hidden=true; return; }
+  const l=e.target.closest('[data-al]'); if(l){ AUTO.len=+l.dataset.al; AUTO._touched=true; readAutoForm(); openAuto(); return; }
+  const p=e.target.closest('[data-ap]'); if(p){ AUTO.pace=p.dataset.ap; readAutoForm(); openAuto(); return; }
+  if(e.target.closest('#autoAddSong')){ readAutoForm(); pendingAutoSong=true; openMusic(); return; }
+  if(e.target.closest('#autoGo')) startAuto();
+});
+$('#autoModal').addEventListener('change',e=>{ if(e.target.id==='autoPx'){ $('#pxBox').hidden=!e.target.checked; } });
+let pendingAutoSong=false;
+$('#autoBtn').onclick=openAuto;
 
 /* ---------------- boot ---------------- */
 (async()=>{
