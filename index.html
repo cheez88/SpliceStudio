@@ -316,7 +316,9 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 .errdetail{margin:0;padding:8px 10px;border-radius:6px;background:var(--raise);font:500 12px/1.45 var(--f-mono);color:#ffb070;word-break:break-word}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);font-weight:700;padding:9px 14px;border-radius:8px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:calc(100% - 32px)}
 .dropover{position:fixed;inset:0;z-index:40;background:rgba(242,193,78,.08);border:3px dashed var(--cue);display:grid;place-items:center;font:800 22px var(--f-brand);pointer-events:none}
-#hold{position:fixed;width:2px;height:2px;overflow:hidden;opacity:0;pointer-events:none;left:0;top:0}
+#hold{position:absolute;left:50%;top:50%;width:96px;height:96px;margin:-48px 0 0 -48px;overflow:hidden;pointer-events:none;z-index:0}
+#hold video,#hold audio{position:absolute;inset:0;width:96px;height:96px;object-fit:cover}
+#cv{position:relative;z-index:1}
 #mbar{display:none}
 
 @media (max-width:1100px){#app{grid-template-columns:236px minmax(0,1fr) 280px} #projName{width:170px}}
@@ -419,7 +421,7 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
   </aside>
 
   <main id="stage">
-    <div class="viewer" id="viewer"><canvas id="cv" width="720" height="1280"></canvas></div>
+    <div class="viewer" id="viewer"><div id="hold" aria-hidden="true"></div><canvas id="cv" width="720" height="1280"></canvas></div>
     <div class="transport">
       <div class="tside"><span class="tc" id="tc">00:00.00 <span>/ 00:00.00</span></span></div>
       <div class="tgroup">
@@ -492,7 +494,6 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 </div>
 <input type="file" id="file" multiple accept="video/*,audio/*,image/*,.mov,.mp4,.m4v,.webm,.jpg,.jpeg,.png,.heic,.webp,.gif,.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,.ogg,.oga,.opus,.m4b" hidden>
 <input type="file" id="fileAudio" multiple accept="audio/*,.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,.ogg,.oga,.opus,.m4b" hidden>
-<div id="hold"></div>
 
 <script>
 (()=>{
@@ -675,12 +676,54 @@ const ease=p=>{p=clamp(p,0,1);return p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2};
    and only seeks if it has drifted a long way. Only clips near the playhead keep a video loaded. */
 let masterId=null;
 let masterAudio=null;
+/* ---- Playback check: measures every cut on this device and writes a short report ---- */
+const diag={on:false,cuts:[],errs:[],lastI:-1,endAt:0};
+function playErr(e){ if(diag.on) diag.errs.push((e&&e.name)||'error'); }
+function diagTick(now){
+  if(!diag.on||!playing) return; const cs=P.clips; layout(); const i=cs.findIndex(c=>T>=c._s&&T<c._s+c._d);
+  if(i>0 && i!==diag.lastI && diag.lastI>=0){ const c=cs[i], prev=cs[i-1], r=slotOf(c.id), m=media[c.mediaId]||{};
+    const rec={n:diag.cuts.length+1, file:(m.name||'?').slice(0,24), type:(m.type||(m.blob&&m.blob.type)||'?'), res:m.w?`${m.w}x${m.h}`:'?', sameFile:prev.mediaId===c.mediaId,
+      trans:!!(prev.tr&&prev.tr.type!=='none'), moving:!!(r&&!r.el.paused&&!r.el.seeking&&r.el.readyState>=3), ready:r?r.el.readyState:-1,
+      off:r?Math.round((r.el.currentTime-(c.in+(T-c._s)*c.speed))*1000):null, rate:r?+r.el.playbackRate.toFixed(2):null, first:null};
+    const t0=performance.now(); if(r&&r.el.requestVideoFrameCallback) r.el.requestVideoFrameCallback(()=>{ rec.first=Math.round(performance.now()-t0); });
+    diag.cuts.push(rec); }
+  diag.lastI=i;
+  if(T>=diag.endAt-.05) finishDiag();
+}
+function startDiag(){
+  if(P.clips.length<2){ toast('Add at least two clips to check the cuts between them'); return; }
+  closeSheets(); layout(); diag.on=true; diag.cuts=[]; diag.errs=[]; diag.lastI=-1; diag.endAt=Math.min(total(),videoEnd(),45);
+  T=0; ensureAudio(); unlockVideos(); setPlaying(true); toast('Checking playback… let it play');
+}
+function finishDiag(){
+  if(!diag.on) return; diag.on=false; setPlaying(false);
+  const cs=diag.cuts, firsts=cs.map(c=>c.first).filter(x=>x!=null), avg=firsts.length?Math.round(firsts.reduce((a,b)=>a+b,0)/firsts.length):null;
+  const ua=navigator.userAgent.replace(/^Mozilla\/5\.0 /,'').slice(0,120);
+  const lines=[`Splice playback check · ${new Date().toLocaleString()}`,`Device: ${ua}`,`Standalone app: ${!!(navigator.standalone||matchMedia('(display-mode: standalone)').matches)} · players: ${vpool.length} · simplified preview: ${lowFx}`,
+    `Cuts: ${cs.length} · moving at the cut: ${cs.filter(c=>c.moving).length} · first new frame avg ${avg??'?'} ms, worst ${firsts.length?Math.max(...firsts):'?'} ms`,
+    `Refused plays: ${diag.errs.length?diag.errs.join(', '):'none'}`,
+    ...cs.map(c=>`#${c.n} ${c.file} [${c.type} ${c.res}]${c.sameFile?' same-file':''}${c.trans?' transition':''}: ${c.moving?'moving':'STILL'}, ready ${c.ready}, off ${c.off}ms, rate ${c.rate}, first frame ${c.first??'?'}ms`)];
+  const txt=lines.join('\n');
+  $('#exBody').innerHTML=`<p class="note" style="margin:0">Each cut was measured on this device. Copy the report and paste it to Claude.</p>
+    <div class="stat">Cuts checked<b>${cs.length}</b></div><div class="stat">Already playing at the cut<b>${cs.filter(c=>c.moving).length} of ${cs.length}</b></div>
+    <div class="stat">Delay to first new frame<b>${avg!=null?`avg ${avg} ms · worst ${Math.max(...firsts)} ms`:'not measurable here'}</b></div>
+    <textarea id="diagTxt" readonly style="min-height:150px;font:500 11px/1.45 var(--f-mono)">${esc(txt)}</textarea>
+    <div class="mfoot"><button class="btn ghost" id="diagClose">Close</button><button class="btn primary" id="diagCopy">Copy report</button></div>`;
+  $('#exH').textContent='Playback check'; $('#exportModal').hidden=false;
+  $('#diagClose').onclick=()=>{ $('#exportModal').hidden=true; $('#exH').textContent='Export video'; };
+  $('#diagCopy').onclick=()=>{ const ta=$('#diagTxt'); const done=()=>toast('Report copied');
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(()=>{ ta.select(); try{ document.execCommand('copy'); done(); }catch(e){ toast('Select the text and copy it'); } });
+    else { ta.focus(); ta.select(); try{ document.execCommand('copy'); done(); }catch(e){ toast('Select the text and copy it'); } } };
+}
 // pictures can be nudged further than sound without anyone noticing, so videos get a wider margin before a hard seek
+// change a player's speed at most every 0.3 s, and only in clear steps
+function setRate(el,nr){ const now=performance.now(); if(Math.abs(el.playbackRate-nr)<.04) return; if(el.__rt && now-el.__rt<300 && Math.abs(nr-1)>.001 && Math.abs(el.playbackRate-nr)<.3) return;
+  try{ el.playbackRate=nr; el.__rt=now; }catch(e){} }
 function softSyncV(el,tgt,rate){
   const d=el.currentTime-tgt;
   if(Math.abs(d)>1){ if(!el.seeking) el.currentTime=tgt; if(el.playbackRate!==rate) el.playbackRate=rate; }
-  else if(Math.abs(d)>.06){ const nr=rate*(d>0?.9:1.1); if(Math.abs(el.playbackRate-nr)>.001) el.playbackRate=nr; }
-  else if(el.playbackRate!==rate) el.playbackRate=rate;
+  else if(Math.abs(d)>.12){ setRate(el,rate*(d>0?.9:1.1)); }
+  else if(Math.abs(d)<.04) setRate(el,rate);
 }
 function softSync(el,tgt,rate){
   const d=el.currentTime-tgt;
@@ -726,21 +769,21 @@ function syncMedia(){
       const pre=c.in+local*c.speed;
       // hard cut: get the next clip moving half a second early (silently), so it's already playing at the cut.
       // If there's no footage before its start point, creep forward at quarter speed instead, arriving almost exactly on time.
-      if(mix===undefined && local<0 && local>-.8){
+      if(mix===undefined && local<0 && local>-1.5){
         setGain(r,0);
         if(pre>=0){
           // the clip isn't on screen yet, so steer it by speed (up to 2x or half speed, invisible here) to land exactly on
           // the right frame at the cut, aiming a hair ahead because a frame takes a moment to reach the screen.
           const aim=pre+.04;
-          if(el.paused){ if(Math.abs(el.currentTime-aim)>.08) el.currentTime=aim; el.playbackRate=c.speed; el.play().catch(()=>{}); }
+          if(el.paused){ if(Math.abs(el.currentTime-aim)>.08) el.currentTime=aim; el.playbackRate=c.speed; el.play().catch(playErr); }
           else { const d=el.currentTime-aim;
-            if(Math.abs(d)>.35 && local<-.3){ if(!el.seeking) el.currentTime=aim+.05; }   // way off and still time: one quiet jump
-            else { const nr=c.speed*clamp(1-d*3,.5,2); if(Math.abs(el.playbackRate-nr)>.02) el.playbackRate=nr; } }
+            if(Math.abs(d)>1 && local<-.8){ if(!el.seeking) el.currentTime=aim+.3; }   // wildly off and plenty of time: one quiet jump
+            else { const st=[.5,.75,1,1.25,1.5,2], want=clamp(1-d*3,.5,2), q=st.reduce((a,b)=>Math.abs(b-want)<Math.abs(a-want)?b:a); setRate(el,c.speed*q); } }
         } else if(c.in<.05){
           // starts at the very beginning of its file: hold near the first frame, creeping at quarter speed so it's moving
           if(el.currentTime>c.in+.25 && !el.seeking) el.currentTime=c.in;
           if(Math.abs(el.playbackRate-c.speed*.25)>.01) try{ el.playbackRate=c.speed*.25; }catch(e){}
-          if(el.paused) el.play().catch(()=>{});
+          if(el.paused) el.play().catch(playErr);
         } else {
           // a little footage before the start point, but not a full head start: wait, then start as soon as there is
           if(!el.paused) el.pause();
@@ -751,7 +794,7 @@ function syncMedia(){
         : (!lowFx && ((local<0 && local>-1.05 && pre>=0) || (local>=c._d && local<c._d+1.05 && pre<=m.dur-.05))); // transition: both clips keep moving, if the device can keep up
       if(rolling){
         setGain(r, mix!==undefined? c.volume*mix : 0);
-        if(el.paused){ if(!atEnd(el,pre)){ if(Math.abs(el.currentTime-pre)>.08) el.currentTime=pre; if(el.playbackRate!==c.speed) el.playbackRate=c.speed; el.play().catch(()=>{}); } }
+        if(el.paused){ if(!atEnd(el,pre)){ if(Math.abs(el.currentTime-pre)>.08) el.currentTime=pre; if(el.playbackRate!==c.speed) el.playbackRate=c.speed; el.play().catch(playErr); } }
         else softSyncV(el,pre,c.speed);
         continue;
       }
@@ -760,7 +803,7 @@ function syncMedia(){
       const run=playing && local>=0 && local<c._d;
       setGain(r, run? c.volume*mix : 0);
       if(run){
-        if(el.paused){ if(!atEnd(el,tgt)){ if(el.playbackRate!==c.speed) el.playbackRate=c.speed; if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.play().catch(()=>{}); } } // at the end of the footage: hold the last frame, don't restart
+        if(el.paused){ if(!atEnd(el,tgt)){ if(el.playbackRate!==c.speed) el.playbackRate=c.speed; if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.play().catch(playErr); } } // at the end of the footage: hold the last frame, don't restart
         else if(c.id===masterId){ if(el.playbackRate!==c.speed) el.playbackRate=c.speed; }
         else softSyncV(el,tgt,c.speed);
       } else { if(!el.paused) el.pause(); if(!el.seeking && Math.abs(el.currentTime-tgt)>0.02) el.currentTime=tgt; }
@@ -777,7 +820,7 @@ function syncMedia(){
     if(playing && inR){
       const g=a.volume*Math.min(1, a.fadeIn>0?local/a.fadeIn:1, a.fadeOut>0?(d-local)/a.fadeOut:1);
       setGain(r,g);
-      if(el.paused){ if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.playbackRate=1; el.play().catch(()=>{}); }
+      if(el.paused){ if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.playbackRate=1; el.play().catch(playErr); }
       else { if(el.playbackRate!==1) el.playbackRate=1;                           // music is never sped up or slowed (that's what sounds wobbly)
         if(a.id!==masterAudio && Math.abs(el.currentTime-tgt)>.6 && !el.seeking) el.currentTime=tgt; }   // only a big drift is corrected
     } else {
@@ -1090,6 +1133,7 @@ function loop(now){
   }
   syncMedia();
   // video only changes ~30 times a second: on 60/120 Hz screens, skip the in-between redraws while video is driving playback
+  diagTick(now);
   const skip=playing && masterId && !exporting && !dirty && now-lastDraw<30;
   if((playing||dirty) && !skip){ draw(); updTime(); dirty=false; lastDraw=now; }
   requestAnimationFrame(loop);
@@ -1472,7 +1516,7 @@ async function readyFrame(v,ms=15000){
   if(v.readyState<1) await waitEvt(v,'loadedmetadata','error',ms);
   if(v.readyState>=2) return;
   const got=new Promise(res=>{ const on=()=>res(true); v.addEventListener('loadeddata',on,{once:true}); v.addEventListener('playing',on,{once:true}); setTimeout(()=>res(false),ms); });
-  v.play().catch(()=>{});            // phones only fetch picture data once asked to play
+  v.play().catch(playErr);            // phones only fetch picture data once asked to play
   const ok=await got; v.pause();
   if(!ok && v.readyState<2){ v.currentTime=Math.min(.1,(v.duration||1)/2); await waitEvt(v,'seeked','error',6000).catch(()=>{}); }
   if(v.readyState<2) throw new Error('This video wouldn\u2019t load a picture');
@@ -1760,6 +1804,7 @@ function renderInspector(){
       <div class="sec"><p class="h6">Shortcuts</p><div class="keys">
         <kbd>Space</kbd><span>Play / pause</span><kbd>S</kbd><span>Split at playhead</span><kbd>Del</kbd><span>Delete selection</span>
         <kbd>Ctrl D</kbd><span>Duplicate</span><kbd>Ctrl Z</kbd><span>Undo</span><kbd>← →</kbd><span>Step one frame (Shift: 1 s)</span><kbd>Ctrl scroll</kbd><span>Zoom timeline</span></div></div>
+      <div class="sec"><p class="h6">Playback check</p><p class="note" style="margin:0 0 10px">Plays your edit once and measures how quickly each cut starts on this device. Makes a short report you can send.</p><button class="btn" data-act="diag">Run playback check</button></div>
       <div class="sec"><button class="btn ghost" data-act="blank" id="blankBtn">Start a blank project</button></div>`;
   } else if(sel.type==='clip'){
     const m=media[o.mediaId]||{}; $('#inspTitle').textContent=m.kind==='image'?'Photo':'Video';
@@ -1897,6 +1942,7 @@ insp.addEventListener('click',e=>{
   else if(act==='lookAll'){ const o=selObj(); P.clips.forEach(c=>{ c.filter=o.filter; c.fxAmt=o.fxAmt==null?100:o.fxAmt; c.adj={...o.adj}; c.vig=o.vig||0; }); commit(); renderTL(); toast('Look copied to every clip'); dirty=true; }
   else if(act==='applyAll'){ const o=selObj(); P.clips.forEach((c,i)=>{ if(i<P.clips.length-1) c.tr={...o.tr}; }); commit(); renderTL(); toast('Applied to every cut'); }
   else if(act==='fitAudio'){ const o=selObj(), ve=videoEnd(); if(ve>o.start+.2){ o.out=Math.min(o.in+(ve-o.start),media[o.mediaId].dur); commit(); renderAll(); } }
+  else if(act==='diag'){ startDiag(); }
   else if(act==='blank'){
     if(Date.now()-blankArm>4000){ blankArm=Date.now(); a.textContent='Click again to clear the timeline'; a.classList.add('danger'); return; }
     P.clips=[];P.texts=[];P.audio=[]; sel=null; T=0; commit(); renderAll(); toast('Timeline cleared. Your media is still in the bin.');
