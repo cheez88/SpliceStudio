@@ -587,7 +587,7 @@ function ensureAudio(){
     actx=new AC(); master=actx.createGain(); spk=actx.createGain();
     master.connect(spk); spk.connect(actx.destination);
     try{ recDest=actx.createMediaStreamDestination(); master.connect(recDest); }catch(e){ recDest=null; }
-    els.forEach(connectEl);
+    els.forEach(connectEl); vpool.forEach(connectEl);
   }catch(e){ actx=null; }
 }
 function connectEl(r){
@@ -599,17 +599,42 @@ function setGain(r,g){
   if(r.gain){ try{ r.gain.gain.setTargetAtTime(g,actx.currentTime,.012); }catch(e){ r.gain.gain.value=g; } } else r.el.volume=clamp(g,0,1);
 }
 function releaseEl(id){ const r=els.get(id); if(!r) return; r.el.pause(); if(r.gain) try{r.gain.disconnect()}catch(e){} r.el.removeAttribute('src'); r.el.load(); r.el.remove(); els.delete(id); }
-function getEl(item){
-  const m=media[item.mediaId]; if(!m||m.kind==='image') return null;
-  let r=els.get(item.id);
-  if(r && r.mediaId===item.mediaId) return r;
-  const el=document.createElement(m.kind==='audio'?'audio':'video');
+/* Video players are pooled: at most 3 (iPhone) or 4 exist, each keeps its file loaded, and they're handed from clip to
+   clip. Moving to the next moment of the same video is then just a seek, not a fresh load of a large file. */
+const vpool=[]; let wantNow=new Set();
+const maxV=()=>(typeof isIOS!=='undefined'&&isIOS)?3:4;
+function newVid(m){
+  const el=document.createElement('video');
   el.preload='auto'; el.playsInline=true; el.setAttribute('playsinline',''); el.src=m.url;
+  const r={el,mediaId:m.id,gain:null,clipId:null,used:0,video:true};
   el.addEventListener('seeked',()=>{dirty=true}); el.addEventListener('loadeddata',()=>{dirty=true});
   // some files (often iPhone .mov) report a longer length than their picture really runs; trust what the player finds
-  el.addEventListener('loadedmetadata',()=>{ const d=el.duration; if(isFinite(d) && d>0 && m.dur-d>.05){ m.dur=d;
-    P.clips.forEach(c=>{ if(c.mediaId===m.id && c.out>d){ c.out=d; if(c.in>d-.2) c.in=Math.max(0,d-.2); } }); P.audio.forEach(a=>{ if(a.mediaId===m.id && a.out>d) a.out=d; });
-    persistMedia(m); renderTL(); scheduleSave(); } });
+  el.addEventListener('loadedmetadata',()=>{ const mm=media[r.mediaId], d=el.duration; if(mm && isFinite(d) && d>0 && mm.dur-d>.05){ mm.dur=d;
+    P.clips.forEach(c=>{ if(c.mediaId===mm.id && c.out>d){ c.out=d; if(c.in>d-.2) c.in=Math.max(0,d-.2); } });
+    persistMedia(mm); renderTL(); scheduleSave(); } });
+  $('#hold').appendChild(el); vpool.push(r); if(actx) connectEl(r); else el.volume=0;
+  return r;
+}
+function slotOf(id){ return vpool.find(x=>x.clipId===id)||null; }
+function slotFor(clip){
+  let r=slotOf(clip.id); if(r && r.mediaId===clip.mediaId){ r.used=performance.now(); return r; }
+  const m=media[clip.mediaId]; if(!m) return null;
+  const free=x=>!x.clipId || !wantNow.has(x.clipId);
+  r=vpool.find(x=>x.mediaId===m.id && free(x));                       // same file already loaded: reuse it
+  if(!r && vpool.length<maxV()) r=newVid(m);
+  if(!r){ r=vpool.filter(free).sort((a,b)=>a.used-b.used)[0];            // otherwise take the least recently used free player
+    if(r){ r.el.pause(); r.el.src=m.url; r.mediaId=m.id; r.primed=false; r.lastG=null; } }
+  if(!r) return null;
+  r.clipId=clip.id; r.used=performance.now(); return r;
+}
+function freeSlot(r){ if(!r) return; r.clipId=null; if(!r.el.paused) r.el.pause(); setGain(r,0); }
+function getEl(item){
+  const m=media[item.mediaId]; if(!m||m.kind==='image') return null;
+  if(m.kind==='video') return slotFor(item);
+  let r=els.get(item.id);
+  if(r && r.mediaId===item.mediaId) return r;
+  const el=document.createElement('audio');
+  el.preload='auto'; el.src=m.url;
   $('#hold').appendChild(el);
   r={el,mediaId:item.mediaId,gain:null}; els.set(item.id,r); if(actx) connectEl(r); else el.volume=0;
   return r;
@@ -617,6 +642,9 @@ function getEl(item){
 function pruneEls(){
   const live=new Set([...P.clips.map(c=>c.id),...P.audio.map(a=>a.id)]);
   els.forEach((r,id)=>{ if(!live.has(id)) releaseEl(id); });
+  for(let i=vpool.length-1;i>=0;i--){ const r=vpool[i];
+    if(!media[r.mediaId]){ r.el.pause(); if(r.gain) try{r.gain.disconnect()}catch(e){} r.el.removeAttribute('src'); r.el.load(); r.el.remove(); vpool.splice(i,1); }
+    else if(r.clipId && !P.clips.some(c=>c.id===r.clipId)) freeSlot(r); }
 }
 
 /* ---------------- timing ---------------- */
@@ -646,6 +674,14 @@ const ease=p=>{p=clamp(p,0,1);return p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2};
    Everything else (the other clip in a transition, music) follows it by nudging its speed a few percent,
    and only seeks if it has drifted a long way. Only clips near the playhead keep a video loaded. */
 let masterId=null;
+let masterAudio=null;
+// pictures can be nudged further than sound without anyone noticing, so videos get a wider margin before a hard seek
+function softSyncV(el,tgt,rate){
+  const d=el.currentTime-tgt;
+  if(Math.abs(d)>1){ if(!el.seeking) el.currentTime=tgt; if(el.playbackRate!==rate) el.playbackRate=rate; }
+  else if(Math.abs(d)>.06){ const nr=rate*(d>0?.9:1.1); if(Math.abs(el.playbackRate-nr)>.001) el.playbackRate=nr; }
+  else if(el.playbackRate!==rate) el.playbackRate=rate;
+}
 function softSync(el,tgt,rate){
   const d=el.currentTime-tgt;
   if(Math.abs(d)>.6){ if(!el.seeking) el.currentTime=tgt; if(el.playbackRate!==rate) el.playbackRate=rate; }
@@ -654,8 +690,10 @@ function softSync(el,tgt,rate){
 }
 function wantedClipIds(){
   const cs=P.clips; layout(); let i=cs.findIndex(c=>T>=c._s&&T<c._s+c._d); if(i<0) i=T>=videoEnd()?cs.length-1:0;
-  const ids=new Set(); for(let j=i-1;j<=i+2;j++) if(cs[j]) ids.add(cs[j].id);
-  if(sel&&sel.type==='clip') ids.add(sel.id);
+  // only what's needed: the clip on screen, the next one, and the previous one while a transition is still showing it
+  const ids=new Set(); if(!cs[i]) return ids; ids.add(cs[i].id); if(cs[i+1]) ids.add(cs[i+1].id);
+  if(cs[i-1] && (T-cs[i]._s<Math.max(.3,trDur(cs[i-1],cs[i])))) ids.add(cs[i-1].id);
+  if(!playing && sel&&sel.type==='clip' && ids.size<maxV()) ids.add(sel.id);
   return ids;
 }
 const atEnd=(el,t)=>el.ended || (isFinite(el.duration) && t>=el.duration-.04);
@@ -666,10 +704,11 @@ function syncMedia(){
   const v=visualAt(T); const act=new Map();
   const mc=playing?pickMaster():null;
   if(v){ if(v.b){ const e=ease(v.p); act.set(v.a.id,1-e); act.set(v.b.id,e); } else act.set(v.a.id,1); }
-  const want=wantedClipIds();
+  const want=wantedClipIds(); wantNow=want;
+  for(const r of vpool) if(r.clipId && !want.has(r.clipId)) freeSlot(r);
   for(const c of P.clips){
     const m=media[c.mediaId]; if(!m||m.kind!=='video') continue;
-    if(!want.has(c.id)){ if(els.has(c.id)) releaseEl(c.id); continue; }
+    if(!want.has(c.id)) continue;
     const r=getEl(c); if(!r) continue; const el=r.el;
     const local=T-c._s, mix=act.get(c.id);
     const tgt=c.in+clamp(local,0,c._d-0.001)*c.speed;
@@ -687,7 +726,7 @@ function syncMedia(){
       if(rolling){
         setGain(r, mix!==undefined? c.volume*mix : 0);
         if(el.paused){ if(!atEnd(el,pre)){ if(Math.abs(el.currentTime-pre)>.08) el.currentTime=pre; if(el.playbackRate!==c.speed) el.playbackRate=c.speed; el.play().catch(()=>{}); } }
-        else softSync(el,pre,c.speed);
+        else softSyncV(el,pre,c.speed);
         continue;
       }
     }
@@ -697,7 +736,7 @@ function syncMedia(){
       if(run){
         if(el.paused){ if(!atEnd(el,tgt)){ if(el.playbackRate!==c.speed) el.playbackRate=c.speed; if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.play().catch(()=>{}); } } // at the end of the footage: hold the last frame, don't restart
         else if(c.id===masterId){ if(el.playbackRate!==c.speed) el.playbackRate=c.speed; }
-        else softSync(el,tgt,c.speed);
+        else softSyncV(el,tgt,c.speed);
       } else { if(!el.paused) el.pause(); if(!el.seeking && Math.abs(el.currentTime-tgt)>0.02) el.currentTime=tgt; }
     } else {
       setGain(r,0); if(!el.paused) el.pause();
@@ -713,7 +752,8 @@ function syncMedia(){
       const g=a.volume*Math.min(1, a.fadeIn>0?local/a.fadeIn:1, a.fadeOut>0?(d-local)/a.fadeOut:1);
       setGain(r,g);
       if(el.paused){ if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.playbackRate=1; el.play().catch(()=>{}); }
-      else softSync(el,tgt,1);
+      else { if(el.playbackRate!==1) el.playbackRate=1;                           // music is never sped up or slowed (that's what sounds wobbly)
+        if(a.id!==masterAudio && Math.abs(el.currentTime-tgt)>.6 && !el.seeking) el.currentTime=tgt; }   // only a big drift is corrected
     } else {
       setGain(r,0); if(!el.paused) el.pause();
       if(!el.seeking && Math.abs(el.currentTime-tgt)>0.05) el.currentTime=tgt;
@@ -722,6 +762,14 @@ function syncMedia(){
 }
 
 /* ---------------- rendering ---------------- */
+// a still to show while a clip's video is still loading: the nearest frame from its timeline strip, else its thumbnail
+function stillFor(m,t){
+  const load=(k,url)=>{ if(!url) return null; if(!m[k]||m[k]._src!==url){ const im=new Image(); im._src=url; im.onload=()=>{dirty=true}; im.src=url; m[k]=im; } return m[k].complete&&m[k].naturalWidth?m[k]:null; };
+  const st=load('_simg',m.strip);
+  if(st){ const fh=st.naturalHeight, fw=Math.max(1,Math.round(fh*(m.w||16)/(m.h||9))), n=Math.max(1,Math.round(st.naturalWidth/fw)), i=clamp(Math.floor(t/Math.max(.01,m.dur)*n),0,n-1);
+    return {img:st,sub:[i*fw,0,fw,fh]}; }
+  const th=load('_pimg',m.thumb); return th?{img:th,sub:[0,0,th.naturalWidth,th.naturalHeight]}:null;
+}
 function adjCss(a){ a=a||{}; let s='';
   if(a.b) s+=` brightness(${(1+a.b/100).toFixed(2)})`; if(a.c) s+=` contrast(${(1+a.c/100).toFixed(2)})`; if(a.s) s+=` saturate(${(1+a.s/100).toFixed(2)})`;
   return s.trim(); }
@@ -763,7 +811,10 @@ function drawClip(c,local,o={}){
   const m=media[c.mediaId]; if(!m) return;
   let src,sw,sh;
   if(m.kind==='image'){ src=m.img; sw=m.w; sh=m.h; }
-  else { const r=getEl(c); if(!r||r.el.readyState<2) return; src=r.el; sw=src.videoWidth; sh=src.videoHeight; }
+  let sub=null;
+  if(m.kind!=='image'){ const r=getEl(c);
+    if(r && r.el.readyState>=2 && r.el.videoWidth){ src=r.el; sw=src.videoWidth; sh=src.videoHeight; }
+    else { const f=stillFor(m,c.in+clamp(local,0,c._d)*c.speed); if(!f) return; src=f.img; sub=f.sub; sw=m.w||f.sub[2]; sh=m.h||f.sub[3]; } }
   if(!sw||!sh) return;
   const p=c._d? clamp(local,0,c._d)/c._d : 0;
   let k=1, px=0;
@@ -782,7 +833,7 @@ function drawClip(c,local,o={}){
     const fc=lowFx&&!exporting? L.fcss.replace(/blur\([^)]*\)/g,'') : L.fcss;
     const f=(L.base+' '+fc+' '+(o.filter||'')).trim(); if(f && canFilter) g.filter=f; }
   g.translate(W/2+ox+dx,H/2); g.scale(c.flipH?-1:1,c.flipV?-1:1); g.rotate(rot*Math.PI/180+a);
-  try{ g.drawImage(src,-dw/2,-dh/2,dw,dh); }catch(e){}
+  try{ if(sub) g.drawImage(src,sub[0],sub[1],sub[2],sub[3],-dw/2,-dh/2,dw,dh); else g.drawImage(src,-dw/2,-dh/2,dw,dh); }catch(e){}
   g.restore();
   if(fxOn) composite(ctx,fxCanvas,o.x||0,W,H,L,o.alpha==null?1:o.alpha,o.clip,o.filter);
 }
@@ -823,7 +874,7 @@ function analyseClip(c,ov){
   const m=media[c.mediaId]; if(!m) return null; let src,sw,sh;
   if(ov){ src=ov; sw=ov.videoWidth; sh=ov.videoHeight; }
   else if(m.kind==='image'){ src=m.img; sw=m.w; sh=m.h; }
-  else { const r=getEl(c); if(!r||r.el.readyState<2) return null; src=r.el; sw=src.videoWidth; sh=src.videoHeight; }
+  else { const r=slotOf(c.id)||getEl(c); if(!r||r.el.readyState<2) return null; src=r.el; sw=src.videoWidth; sh=src.videoHeight; }
   if(!sw||!sh) return null;
   const cw=112, chh=Math.max(8,Math.round(cw*sh/sw)), cc=document.createElement('canvas'); cc.width=cw; cc.height=chh;
   const g=cc.getContext('2d',{willReadFrequently:true}); g.drawImage(src,0,0,cw,chh);
@@ -970,6 +1021,11 @@ function updTime(){
   const ph=$('#ph'); if(ph) ph.style.left=(headW()+T*pps)+'px';
 }
 let lastNow=0, frameAvg=16, lowFx=false, lastDraw=0, holdSince=0;
+function audioMaster(){
+  for(const a of P.audio){ const d=a.out-a.in, local=T-a.start; if(local<.02||local>=d-.05) continue;
+    const r=els.get(a.id); if(r && !r.el.paused && !r.el.seeking && r.el.readyState>=3 && (r.lastG==null||r.lastG>0)) return {a,r}; }
+  return null;
+}
 function pickMaster(){
   const v=visualAt(T); if(!v) return null;
   const c=(v.b && T>=v.b._s)?v.b:v.a, m=media[c.mediaId];
@@ -979,9 +1035,12 @@ function loop(now){
   const dt=lastNow?now-lastNow:16; lastNow=now;
   if(playing){
     let t=playT0+(now-playW0)/1000;
-    masterId=null;
-    const mc=pickMaster(), r=mc&&els.get(mc.id);
-    if(r && !r.el.paused){
+    masterId=null; masterAudio=null;
+    // music is what people notice skipping, so when a song is playing it keeps time and the pictures follow it
+    const am=audioMaster();
+    const mc=am?null:pickMaster(), r=mc&&slotOf(mc.id);
+    if(am){ const lt=am.a.start+(am.r.el.currentTime-am.a.in); if(Math.abs(lt-t)<1.5){ t=Math.max(T,lt); masterAudio=am.a.id; } playT0=t; playW0=now; holdSince=0; }
+    else if(r && !r.el.paused){
       if(r.el.seeking||r.el.readyState<3){ if(!holdSince) holdSince=now; if(now-holdSince<500) t=T; }  // still loading: wait briefly rather than run ahead
       else { holdSince=0; const lt=(r.el.currentTime-mc.in)/mc.speed;
         if(lt>=-.1 && lt<=mc._d+.15){ t=Math.max(T,mc._s+lt); masterId=mc.id; } }   // follow the video; never step backwards
@@ -2114,7 +2173,7 @@ async function saveNow(){
 }
 function clearWorkspace(){
   setPlaying(false);
-  els.forEach(r=>{ r.el.pause(); if(r.gain) try{r.gain.disconnect()}catch(e){} r.el.removeAttribute('src'); r.el.load(); r.el.remove(); }); els.clear();
+  [...els.values(),...vpool].forEach(r=>{ r.el.pause(); if(r.gain) try{r.gain.disconnect()}catch(e){} r.el.removeAttribute('src'); r.el.load(); r.el.remove(); }); els.clear(); vpool.length=0;
   for(const k of Object.keys(media)){ try{ URL.revokeObjectURL(media[k].url); }catch(e){} delete media[k]; }
   sel=null; hist=[]; hi=-1;
 }
