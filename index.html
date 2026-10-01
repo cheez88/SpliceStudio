@@ -1491,7 +1491,7 @@ async function importFiles(files){
   // a batch lands on the timeline in the order it was shot, whatever order it was picked in
   ok.sort((a,b)=>(a.taken||0)-(b.taken||0));
   const added=[];
-  for(const m of ok){ added.push(addMedia(m,false)); await persistMedia(m); }
+  for(const m of ok){ added.push(addMedia(m,false)); persistMedia(m); }
   if(added.length && dbOK && !askedPersist && navigator.storage && navigator.storage.persist){ askedPersist=true; navigator.storage.persist().catch(()=>{}); }
   if(pendingAutoSong){ pendingAutoSong=false; const a=ok.filter(m=>m.kind==='audio').pop(); if(a) AUTO.music=a.id; }
   if(added.length && !$('#autoModal').hidden) setTimeout(openAuto,50);
@@ -2034,8 +2034,10 @@ async function loadSample(){
 /* ---------------- saved projects (IndexedDB, on this device) ---------------- */
 const DB={db:null,
   open(){ return new Promise((res,rej)=>{ if(!window.indexedDB) return rej(new Error('no idb'));
-    const r=indexedDB.open('splice-studio',1);
-    r.onupgradeneeded=()=>{ const d=r.result; d.createObjectStore('projects',{keyPath:'id'}); d.createObjectStore('media',{keyPath:'id'}); };
+    const r=indexedDB.open('splice-studio',2);
+    r.onupgradeneeded=()=>{ const d=r.result, has=n=>d.objectStoreNames.contains(n);
+      if(!has('projects')) d.createObjectStore('projects',{keyPath:'id'}); if(!has('media')) d.createObjectStore('media',{keyPath:'id'});
+      if(!has('chunks')) d.createObjectStore('chunks',{keyPath:'k'}); };
     r.onsuccess=()=>{ this.db=r.result; res(this.db); }; r.onerror=()=>rej(r.error); r.onblocked=()=>rej(new Error('blocked')); }); },
   tx(st,mode,fn){ return new Promise((res,rej)=>{ const t=this.db.transaction(st,mode), q=fn(t.objectStore(st)); let out;
     if(q) q.onsuccess=()=>{ out=q.result; }; t.oncomplete=()=>res(out); t.onerror=t.onabort=()=>rej(t.error); }); },
@@ -2048,10 +2050,57 @@ let dbOK=false, curId=null, curCreated=0, loadingProj=false, saveTimer=0, askedP
 const lsGet=k=>{ try{ return localStorage.getItem(k); }catch(e){ return null; } };
 const lsSet=(k,v)=>{ try{ localStorage.setItem(k,v); }catch(e){} };
 function setSaveState(s){ const el=$('#saveSt'); if(el){ el.textContent=s; el.dataset.s=s; el.title=s==='Saved'?'Saved on this device':s; } }
+/* Media is saved in two parts:
+   - the file's data, once, copied in 8 MB pieces. Copying matters: Safari often refuses to store a file straight from the
+     photo/file picker ("Error preparing Blob/File data"), but stores copied data fine. Pieces keep memory use low.
+   - the small details (name, thumbnail, analysis…), which can be updated any time without touching the data. */
+const CHUNK=8*1024*1024; let mediaSaving=0; const saveWarned=new Set();
+const isQuotaErr=e=>e&&(e.name==='QuotaExceededError'||/quota|space|full/i.test(e.message||''));
+async function saveMediaData(m){
+  if(m.blobSaved) return; if(m._saving) return m._saving;
+  m._saving=(async()=>{
+    const b=m.blob, n=Math.max(1,Math.ceil(b.size/CHUNK));
+    for(let i=0;i<n;i++){
+      const buf=await b.slice(i*CHUNK,Math.min(b.size,(i+1)*CHUNK)).arrayBuffer();
+      const rec={k:m.id+':'+i,id:m.id,i,data:new Blob([buf])};
+      try{ await DB.put('chunks',rec); }
+      catch(e){ if(isQuotaErr(e)) throw e; rec.data=buf; await DB.put('chunks',rec); }   // some browsers only accept raw bytes
+    }
+    m.blobSaved=true; m.chunks=n; m.size=b.size; m.type=b.type||'';
+  })();
+  try{ await m._saving; } finally{ m._saving=null; }
+}
+async function reportSaveError(e,m){
+  console.warn('media save failed',m&&m.name,e);
+  const key=(m&&m.id)+(e&&e.name); if(saveWarned.has(key)) return; saveWarned.add(key);
+  if(isQuotaErr(e)){
+    let detail=''; try{ const est=await navigator.storage.estimate(); if(est&&est.quota) detail=` It has used ${(est.usage/1e9).toFixed(1)} GB of the ${(est.quota/1e9).toFixed(1)} GB your browser allows this app.`; }catch(x){}
+    toast(`Couldn\u2019t keep \u201c${m.name}\u201d for next time: the browser\u2019s storage for this app is full.${detail} Delete old projects in Projects to free space.`);
+  } else toast(`Couldn\u2019t keep \u201c${m.name}\u201d for next time (${(e&&e.name)||'save error'}). It\u2019s still in this edit; if it\u2019s missing after reopening, add it again.`);
+}
 function persistMedia(m){
   if(!dbOK||!m.blob) return Promise.resolve();
-  return DB.put('media',{id:m.id,name:m.name,kind:m.kind,blob:m.blob,dur:isFinite(m.dur)?m.dur:null,w:m.w,h:m.h,sample:!!m.sample,
-    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null,taken:m.taken||null,takenSrc:m.takenSrc||null,added:m.added||null,rot:m.rot||0,vendChecked:!!m.vendChecked,analysis:m.analysis||null,pixabay:!!m.pixabay,credit:m.credit||null,pageURL:m.pageURL||null}).catch(()=>toast('Your device is out of storage space for saved media.'));
+  const first=!m.blobSaved; if(first){ mediaSaving++; setSaveState('Saving…'); }
+  return (async()=>{
+    try{ await saveMediaData(m); await DB.put('media',mediaMeta(m)); }
+    catch(e){ reportSaveError(e,m); }
+    finally{ if(first){ mediaSaving--; if(!mediaSaving) setSaveState('Saved'); } }
+  })();
+}
+function mediaMeta(m){
+  return {id:m.id,name:m.name,kind:m.kind,chunks:m.chunks,size:m.size,type:m.type,dur:isFinite(m.dur)?m.dur:null,w:m.w,h:m.h,sample:!!m.sample,
+    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null,taken:m.taken||null,takenSrc:m.takenSrc||null,added:m.added||null,rot:m.rot||0,vendChecked:!!m.vendChecked,analysis:m.analysis||null,pixabay:!!m.pixabay,credit:m.credit||null,pageURL:m.pageURL||null};
+}
+async function readMediaData(mr){
+  if(mr.blob) return mr.blob;                         // saved by an older version: still readable, re-saved in pieces on next change
+  if(!mr.chunks) return null; const parts=[];
+  for(let i=0;i<mr.chunks;i++){ const c=await DB.get('chunks',mr.id+':'+i).catch(()=>null); if(!c) return null; parts.push(c.data); }
+  return new Blob(parts,{type:mr.type||''});
+}
+async function deleteMediaStored(mid){
+  const mr=await DB.get('media',mid).catch(()=>null);
+  if(mr&&mr.chunks) for(let i=0;i<mr.chunks;i++) await DB.del('chunks',mid+':'+i).catch(()=>{});
+  await DB.del('media',mid).catch(()=>{});
 }
 function thumbOf(){ try{ const c=document.createElement('canvas'), k=240/Math.max(W,H); c.width=Math.round(W*k); c.height=Math.round(H*k); c.getContext('2d').drawImage(cv,0,0,c.width,c.height); return c.toDataURL('image/jpeg',.7); }catch(e){ return null; } }
 function scheduleSave(){ if(!dbOK||!curId||loadingProj) return; setSaveState('Saving…'); clearTimeout(saveTimer); saveTimer=setTimeout(saveNow,700); }
@@ -2060,7 +2109,7 @@ async function saveNow(){
   const rec={id:curId,name:($('#projName').value||'').trim()||'Untitled edit',created:curCreated||Date.now(),updated:Date.now(),
     P:JSON.parse(snapshot()),mediaIds:Object.keys(media),thumb:exporting?null:thumbOf(),dur:total(),T};
   if(!rec.thumb){ const old=await DB.get('projects',curId).catch(()=>null); if(old) rec.thumb=old.thumb; }
-  try{ await DB.put('projects',rec); setSaveState('Saved'); lsSet('splice.last',curId); }
+  try{ await DB.put('projects',rec); setSaveState(mediaSaving?'Saving…':'Saved'); lsSet('splice.last',curId); }
   catch(e){ setSaveState('Not saved'); toast('Couldn’t save this project. Your device may be out of space.'); }
 }
 function clearWorkspace(){
@@ -2075,8 +2124,8 @@ async function openProject(id){
   loadingProj=true; clearWorkspace();
   let missing=0;
   for(const mid of rec.mediaIds||[]){
-    const mr=await DB.get('media',mid).catch(()=>null); if(!mr||!mr.blob){ missing++; continue; }
-    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave,taken:mr.taken||null,takenSrc:mr.takenSrc||null,added:mr.added||0,rot:mr.rot||0,vendChecked:!!mr.vendChecked,analysis:mr.analysis||null,pixabay:!!mr.pixabay,credit:mr.credit||null,pageURL:mr.pageURL||null};
+    const mr=await DB.get('media',mid).catch(()=>null); const blob=mr&&await readMediaData(mr).catch(()=>null); if(!blob){ missing++; continue; } mr.blob=blob;
+    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave,taken:mr.taken||null,takenSrc:mr.takenSrc||null,added:mr.added||0,rot:mr.rot||0,blobSaved:!!mr.chunks,chunks:mr.chunks,size:mr.size,type:mr.type,vendChecked:!!mr.vendChecked,analysis:mr.analysis||null,pixabay:!!mr.pixabay,credit:mr.credit||null,pageURL:mr.pageURL||null};
     try{
       if(m.kind==='image'){ const img=new Image(); img.src=m.url; await img.decode(); m.img=img; m.w=img.naturalWidth; m.h=img.naturalHeight; m.thumb=m.url; m.dur=Infinity; }
       else if(m.kind==='video' && !m.strip) makeStrip(m).then(()=>persistMedia(m));
@@ -2102,7 +2151,7 @@ async function newProject(){
 async function deleteProject(id){
   const recs=await DB.all('projects'); const rec=recs.find(r=>r.id===id); if(!rec) return;
   const inUse=new Set(); recs.forEach(r=>{ if(r.id!==id) (r.mediaIds||[]).forEach(m=>inUse.add(m)); });
-  for(const mid of rec.mediaIds||[]) if(!inUse.has(mid)) await DB.del('media',mid).catch(()=>{});
+  for(const mid of rec.mediaIds||[]) if(!inUse.has(mid)) await deleteMediaStored(mid);
   await DB.del('projects',id);
   if(id===curId){
     curId=null; const rest=recs.filter(r=>r.id!==id).sort((a,b)=>b.updated-a.updated);
