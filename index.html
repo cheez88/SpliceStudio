@@ -313,6 +313,7 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 .pxbox a,.modal .note a{color:var(--cue)}
 .chip-s.px{left:auto;right:5px;bottom:5px;background:#1d2129;color:#8fd3b9}
 .btn[disabled]{opacity:.4;cursor:default}
+.errdetail{margin:0;padding:8px 10px;border-radius:6px;background:var(--raise);font:500 12px/1.45 var(--f-mono);color:#ffb070;word-break:break-word}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--fg);color:var(--bg);font-weight:700;padding:9px 14px;border-radius:8px;z-index:60;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:calc(100% - 32px)}
 .dropover{position:fixed;inset:0;z-index:40;background:rgba(242,193,78,.08);border:3px dashed var(--cue);display:grid;place-items:center;font:800 22px var(--f-brand);pointer-events:none}
 #hold{position:fixed;width:2px;height:2px;overflow:hidden;opacity:0;pointer-events:none;left:0;top:0}
@@ -815,7 +816,7 @@ function wbGains(t,k){ let r=1,g=1,b=1; if(t>0) b-=t*.4; else r-=-t*.4; g-=Math.
 async function analyseClipAsync(c){
   const r=analyseClip(c); if(r) return r; const m=media[c.mediaId]; if(!m||m.kind!=='video') return null;
   const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.preload='auto'; v.src=m.url; let out=null;
-  try{ await waitEvt(v,'loadeddata','error',8000); v.currentTime=Math.min(c.out-.05,c.in+Math.min(1,(c.out-c.in)/2)); await waitEvt(v,'seeked','error',8000); out=analyseClip(c,v); }catch(e){}
+  try{ await readyFrame(v,8000); v.currentTime=Math.min(c.out-.05,c.in+Math.min(1,(c.out-c.in)/2)); await waitEvt(v,'seeked','error',8000); out=analyseClip(c,v); }catch(e){}
   v.removeAttribute('src'); v.load(); return out;
 }
 function analyseClip(c,ov){
@@ -1366,7 +1367,7 @@ async function probeVideoEnd(m){
   const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.preload='auto'; v.src=m.url;
   v.style.cssText='position:fixed;left:0;top:0;width:4px;height:4px;opacity:.01;pointer-events:none'; document.body.appendChild(v);
   try{
-    await waitEvt(v,'loadeddata','error',10000);
+    await readyFrame(v,10000);
     const target=Math.max(0,m.dur-.03);
     const mt=await new Promise(res=>{ const to=setTimeout(()=>res(null),3000); v.requestVideoFrameCallback((n,meta)=>{ clearTimeout(to); res(meta.mediaTime); }); v.currentTime=target; });
     if(mt!=null && target-mt>.2) applyVideoEnd(m,mt+.034);
@@ -1374,10 +1375,21 @@ async function probeVideoEnd(m){
   }catch(e){}
   v.removeAttribute('src'); v.load(); v.remove();
 }
+const isIOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+async function readyFrame(v,ms=15000){
+  v.muted=true; v.playsInline=true; v.setAttribute('playsinline',''); v.preload='auto';
+  if(v.readyState<1) await waitEvt(v,'loadedmetadata','error',ms);
+  if(v.readyState>=2) return;
+  const got=new Promise(res=>{ const on=()=>res(true); v.addEventListener('loadeddata',on,{once:true}); v.addEventListener('playing',on,{once:true}); setTimeout(()=>res(false),ms); });
+  v.play().catch(()=>{});            // phones only fetch picture data once asked to play
+  const ok=await got; v.pause();
+  if(!ok && v.readyState<2){ v.currentTime=Math.min(.1,(v.duration||1)/2); await waitEvt(v,'seeked','error',6000).catch(()=>{}); }
+  if(v.readyState<2) throw new Error('This video wouldn\u2019t load a picture');
+}
 async function makeStrip(m){
   try{
     const v=document.createElement('video'); v.muted=true; v.preload='auto'; v.playsInline=true; v.src=m.url;
-    await waitEvt(v,'loadeddata');
+    await readyFrame(v);
     const n=clamp(Math.ceil(m.dur/2),1,30), fh=72, fw=Math.round(fh*(m.w||16)/(m.h||9));
     const c=document.createElement('canvas'); c.width=n*fw; c.height=fh; const g=c.getContext('2d');
     for(let i=0;i<n;i++){
@@ -2157,7 +2169,7 @@ async function analyseVideoMedia(m,onProg,run){
   v.style.cssText='position:fixed;left:0;top:0;width:4px;height:4px;opacity:.01;pointer-events:none'; document.body.appendChild(v);
   const S=[]; let prev=null;
   try{
-    await waitEvt(v,'loadeddata','error',15000);
+    await readyFrame(v,15000);
     const dur=m.dur, sw=v.videoWidth||16, sh=v.videoHeight||9, w=64, h=Math.max(8,Math.round(64*sh/sw));
     const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d',{willReadFrequently:true});
     const grab=t=>{
@@ -2192,7 +2204,7 @@ async function analyseVideoMedia(m,onProg,run){
   if(run.cancel) return null;
   // loudness from the soundtrack (skipped for very large files to spare the phone's memory)
   let loud=null;
-  if(m.blob && m.blob.size<160e6){
+  if(m.blob && m.blob.size<(isIOS?80e6:160e6)){
     try{ const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; const ab=await new OAC(1,44100,44100).decodeAudioData(await m.blob.arrayBuffer());
       const ch=ab.getChannelData(0), sr=ab.sampleRate, N=Math.ceil(m.dur); loud=new Array(N).fill(0);
       for(let s=0;s<N;s++){ const a=Math.floor(s*sr), b=Math.min(ch.length,Math.floor((s+1)*sr)); let pk=0;
@@ -2309,10 +2321,11 @@ async function buildAutoEdit(opts,ui){
   if(song){ ui.step('Finding the beat of your song'); try{ beat=await analyseMusic(song); }catch(e){ beat=null; }
     if(beat && beat.dur>=20) target=Math.min(target,beat.dur); }
   // look at every video
-  const totalSecs=vids.reduce((a,m)=>a+m.dur,0)||1; let doneSecs=0;
+  const totalSecs=vids.reduce((a,m)=>a+m.dur,0)||1; let doneSecs=0; const failed=[];
   for(const [i,m] of vids.entries()){
     ui.step(`Watching video ${i+1} of ${vids.length}: ${m.name}`);
-    await analyseVideoMedia(m,f=>ui.prog(.08+.72*(doneSecs+f*m.dur)/totalSecs),run);
+    try{ await analyseVideoMedia(m,f=>ui.prog(.08+.72*(doneSecs+f*m.dur)/totalSecs),run); }
+    catch(e){ console.warn('analysis failed',m.name,e); failed.push(m); ui.note(`Couldn\u2019t study \u201c${m.name}\u201d (${e&&e.message||'unknown reason'}), so evenly spaced moments from it were used.`); }
     if(run.cancel) return null; doneSecs+=m.dur;
   }
   ui.prog(.82);
@@ -2326,7 +2339,7 @@ async function buildAutoEdit(opts,ui){
   }
   if(run.cancel) return null;
   ui.step('Choosing the best moments'); ui.prog(.9);
-  const vidsOK=vids.filter(m=>m.analysis);
+  const vidsOK=vids.filter(m=>m.analysis && !failed.includes(m));
   if(vidsOK.length) scoreVideos(vidsOK);
   // your own highlights (Marks) are always kept
   const must=[];
@@ -2335,15 +2348,20 @@ async function buildAutoEdit(opts,ui){
   const brollShare=wantBroll?.18:0;
   const title=opts.title?Math.min(3,pace.len):0;
   let moments=vidsOK.length?pickMoments(vidsOK,Math.max(pace.len,(target-title)*(1-brollShare)),pace,must):[];
+  // videos that couldn't be studied: take a few evenly spaced moments so they're still represented
+  for(const m of failed){ const n=clamp(Math.round(m.dur/20),1,4), L=Math.min(pace.len,m.dur);
+    for(let k=0;k<n;k++){ const a=Math.max(0,(m.dur-L)*(k+.5)/n); moments.push({m,a,b:Math.min(m.dur-.05,a+L),s:.5}); } }
+  if(failed.length){ const when=m=>m.taken||m.added||0; moments.sort((x,y)=>(when(x.m)-when(y.m))||(x.m===y.m?x.a-y.a:0)); }
+  const anyVid=vidsOK.length||failed.length;
   // B-roll pool: Pixabay clips, then your photos, then calm, steady shots from your own videos
   const pool=[];
   pxClips.forEach(m=>pool.push({m,a:Math.min(1,m.dur*.2),b:Math.min(m.dur-.05,Math.min(1,m.dur*.2)+3.2),broll:true}));
   if(opts.broll){ photos.sort((a,b)=>(a.taken||a.added||0)-(b.taken||b.added||0)).forEach(m=>pool.push({m,a:0,b:2.6,broll:true,photo:true}));
     if(vidsOK.length) calmShots(vidsOK,moments,3).forEach(x=>pool.push(x)); }
-  if(!vidsOK.length) photos.forEach(m=>{ if(!pool.some(p=>p.m===m)) pool.push({m,a:0,b:pace.len,broll:false,photo:true}); });
+  if(!vidsOK.length && !failed.length) photos.forEach(m=>{ if(!pool.some(p=>p.m===m)) pool.push({m,a:0,b:pace.len,broll:false,photo:true}); });
   // sequence: an opener, then moments with B-roll woven in
   const seq=[];
-  if(vidsOK.length){
+  if(anyVid){
     if(pool.length) seq.push(pool.shift());
     moments.forEach((x,i)=>{ seq.push(x); if(pool.length && (i+1)%pace.every===0 && i<moments.length-1) seq.push(pool.shift()); });
     if(pool.length && seq.length>3) seq.push(pool.shift());
@@ -2439,7 +2457,12 @@ async function startAuto(){
   const ui={step:s=>{ const e=$('#autoStep'); if(e) e.textContent=s; }, prog:f=>{ const b=$('#autoBar'), p=$('#autoPct'); if(b) b.style.width=(f*100).toFixed(1)+'%'; if(p) p.textContent=Math.round(f*100)+'%'; }, note:n=>notes.push(n)};
   let r=null;
   try{ r=await buildAutoEdit({...AUTO},ui); }
-  catch(e){ console.warn(e); $('#autoBody').innerHTML=`<p class="note">${e.message==='nomedia'?'Import your videos or photos first.':'Something went wrong while making the edit, so nothing was changed. Try again, or try fewer or shorter videos.'}</p><div class="mfoot"><button class="btn" data-autoclose>Close</button></div>`; return; }
+  catch(e){ console.warn(e);
+    const msg=e&&e.message||String(e), where=(e&&e.stack||'').split('\n').slice(0,2).join(' ').slice(0,160);
+    $('#autoBody').innerHTML=`<p class="note" style="margin:0">${msg==='nomedia'?'Import your videos or photos first.':'Auto edit stopped before it finished, so nothing was changed.'}</p>
+      ${msg!=='nomedia'?`<p class="note" style="margin:0">Last step: <b>${esc(($('#autoStep')||{}).textContent||'starting')}</b></p><p class="note errdetail">Reason: ${esc(msg)}${where?`<br><small>${esc(where)}</small>`:''}</p><p class="note" style="margin:0">If this keeps happening, send me the reason above.</p>`:''}
+      <div class="mfoot"><button class="btn" data-autoclose>Close</button><button class="btn primary" id="autoRetry">Try again</button></div>`;
+    const rb=$('#autoRetry'); if(rb) rb.onclick=openAuto; autoRun=null; return; }
   if(!r){ $('#autoModal').hidden=true; toast('Auto edit stopped. Nothing was changed.'); return; }
   $('#autoBody').innerHTML=`<div style="display:grid;gap:12px">
     <p style="margin:0;font:800 17px/1.3 var(--f-brand)">Your ${fmtD(r.len)} video is ready</p>
