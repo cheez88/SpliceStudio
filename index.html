@@ -702,6 +702,7 @@ function finishDiag(){
   const lines=[`Splice playback check · ${new Date().toLocaleString()}`,`Device: ${ua}`,`Standalone app: ${!!(navigator.standalone||matchMedia('(display-mode: standalone)').matches)} · players: ${vpool.length} · simplified preview: ${lowFx}`,
     `Cuts: ${cs.length} · moving at the cut: ${cs.filter(c=>c.moving).length} · first new frame avg ${avg??'?'} ms, worst ${firsts.length?Math.max(...firsts):'?'} ms`,
     `Refused plays: ${diag.errs.length?diag.errs.join(', '):'none'}`,
+    `Rotation tags: browser ${rotMode||'?'} · ${Object.values(media).filter(m=>m.kind==='video'&&!m.sample).map(m=>`${m.name.slice(0,18)} tag ${m.metaRot||0}° turn ${m.rot||0}°${m.rotUser?' (you)':m.orient?' (auto)':''}`).join('; ')||'no videos'}`,
     ...cs.map(c=>`#${c.n} ${c.file} [${c.type} ${c.res}]${c.sameFile?' same-file':''}${c.trans?' transition':''}: ${c.moving?'moving':'STILL'}, ready ${c.ready}, off ${c.off}ms, rate ${c.rate}, first frame ${c.first??'?'}ms`)];
   const txt=lines.join('\n');
   $('#exBody').innerHTML=`<p class="note" style="margin:0">Each cut was measured on this device. Copy the report and paste it to Claude.</p>
@@ -880,16 +881,16 @@ function drawClip(c,local,o={}){
   const m=media[c.mediaId]; if(!m) return;
   let src,sw,sh;
   if(m.kind==='image'){ src=m.img; sw=m.w; sh=m.h; }
-  let sub=null;
+  let sub=null, metaTurn=0;
   if(m.kind!=='image'){ const r=getEl(c);
-    if(r && r.el.readyState>=2 && r.el.videoWidth){ src=r.el; sw=src.videoWidth; sh=src.videoHeight; }
+    if(r && r.el.readyState>=2 && r.el.videoWidth){ src=r.el; sw=src.videoWidth; sh=src.videoHeight; if(needTurn(m)){ metaTurn=m.metaRot; if(rotMode==='stretched'&&m.metaRot%180){ const t=sw; sw=sh; sh=t; } } }
     else { const f=stillFor(m,c.in+clamp(local,0,c._d)*c.speed); if(!f) return; src=f.img; sub=f.sub; sw=m.w||f.sub[2]; sh=m.h||f.sub[3]; } }
   if(!sw||!sh) return;
   const p=c._d? clamp(local,0,c._d)/c._d : 0;
   let k=1, px=0;
   switch(c.motion){ case 'zoomIn':k=1+.16*p;break; case 'zoomOut':k=1.16-.16*p;break; case 'panL':k=1.18;px=(p-.5);break; case 'panR':k=1.18;px=(.5-p);break; }
   // orientation: quarter turns + fine straighten, flips happen in screen space
-  const rot=((c.rot||0)%360+360)%360, side=rot%180!==0, ew=side?sh:sw, eh=side?sw:sh;
+  const rot=(((c.rot||0)+metaTurn)%360+360)%360, side=rot%180!==0, ew=side?sh:sw, eh=side?sw:sh;
   const a=(c.str||0)*Math.PI/180, ca=Math.abs(Math.cos(a)), sa=Math.abs(Math.sin(a));
   const base=c.fit==='fit'? Math.min(W/ew,H/eh) : Math.max((W*ca+H*sa)/ew,(W*sa+H*ca)/eh);
   const s=base*k*(o.scale||1), dw=sw*s, dh=sh*s;
@@ -1484,7 +1485,7 @@ async function probe(m,file){
   await waitEvt(el,'loadedmetadata');
   let d=el.duration;
   if(!isFinite(d)){ el.currentTime=1e7; await waitEvt(el,'timeupdate','error',5000).catch(()=>{}); d=isFinite(el.duration)?el.duration:10; }
-  m.dur=d; if(m.kind==='video'){ m.w=el.videoWidth; m.h=el.videoHeight; makeStrip(m).then(()=>probeVideoEnd(m)); }
+  m.dur=d; if(m.kind==='video'){ m.w=el.videoWidth; m.h=el.videoHeight; if(file) m.blob=file; checkRotation(m).then(()=>m.strip?null:makeStrip(m)).then(()=>probeVideoEnd(m)); }
   else if(file) file.arrayBuffer().then(b=>makeWave(m,b)).catch(()=>{});
 }
 /* Some videos (often from phones) have sound that runs on after the picture stops, so the file claims to be longer than
@@ -1521,6 +1522,56 @@ async function readyFrame(v,ms=15000){
   if(!ok && v.readyState<2){ v.currentTime=Math.min(.1,(v.duration||1)/2); await waitEvt(v,'seeked','error',6000).catch(()=>{}); }
   if(v.readyState<2) throw new Error('This video wouldn\u2019t load a picture');
 }
+/* Rotation tags. Phones save which way they were held as a tag on the video (portrait = turn 90°, upside down = 180°).
+   Most browsers apply it when drawing a frame; some (seen on iPhone) don't. A tiny tagged test video tells us which,
+   and if the browser doesn't, every frame is turned here instead. */
+const PROBE_MP4='AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAM4bW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAAfQAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAmJ0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAAfQAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAA//8AAAAAAAAAAAAAAAAAAAAAAABAAAAAAEAAAAAgAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAH0AAAAAAABAAAAAAHabWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAAoAAAAFABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAABhW1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAUVzdGJsAAAAuXN0c2QAAAAAAAAAAQAAAKlhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAEAAIABIAAAASAAAAAAAAAABFUxhdmM2MC4zMS4xMDIgbGlieDI2NAAAAAAAAAAAAAAAGP//AAAAL2F2Y0MBQsAK/+EAF2dCwArZBFsBEAAAAwAQAAADAUDxImSAAQAFaMuBEsgAAAAQcGFzcAAAAAEAAAABAAAAFGJ0cnQAAAAAAAAsgAAALIAAAAAYc3R0cwAAAAAAAAABAAAABQAABAAAAAAUc3RzcwAAAAAAAAABAAAAAQAAABxzdHNjAAAAAAAAAAEAAAABAAAABQAAAAEAAAAoc3RzegAAAAAAAAAAAAAABQAAAqAAAAAKAAAACgAAAAoAAAAKAAAAFHN0Y28AAAAAAAAAAQAAA2gAAABidWR0YQAAAFptZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyYXBwbAAAAAAAAAAAAAAAAC1pbHN0AAAAJal0b28AAAAdZGF0YQAAAAEAAAAATGF2ZjYwLjE2LjEwMAAAAAhmcmVlAAAC0G1kYXQAAAJxBgX//23cRem95tlIt5Ys2CDZI+7veDI2NCAtIGNvcmUgMTY0IHIzMTA4IDMxZTE5ZjkgLSBILjI2NC9NUEVHLTQgQVZDIGNvZGVjIC0gQ29weWxlZnQgMjAwMy0yMDIzIC0gaHR0cDovL3d3dy52aWRlb2xhbi5vcmcveDI2NC5odG1sIC0gb3B0aW9uczogY2FiYWM9MCByZWY9MyBkZWJsb2NrPTE6MDowIGFuYWx5c2U9MHgxOjB4MTExIG1lPWhleCBzdWJtZT03IHBzeT0xIHBzeV9yZD0xLjAwOjAuMDAgbWl4ZWRfcmVmPTEgbWVfcmFuZ2U9MTYgY2hyb21hX21lPTEgdHJlbGxpcz0xIDh4OGRjdD0wIGNxbT0wIGRlYWR6b25lPTIxLDExIGZhc3RfcHNraXA9MSBjaHJvbWFfcXBfb2Zmc2V0PS0yIHRocmVhZHM9MSBsb29rYWhlYWRfdGhyZWFkcz0xIHNsaWNlZF90aHJlYWRzPTAgbnI9MCBkZWNpbWF0ZT0xIGludGVybGFjZWQ9MCBibHVyYXlfY29tcGF0PTAgY29uc3RyYWluZWRfaW50cmE9MCBiZnJhbWVzPTAgd2VpZ2h0cD0wIGtleWludD0yNTAga2V5aW50X21pbj0xMCBzY2VuZWN1dD00MCBpbnRyYV9yZWZyZXNoPTAgcmNfbG9va2FoZWFkPTQwIHJjPWNyZiBtYnRyZWU9MSBjcmY9MzAuMCBxY29tcD0wLjYwIHFwbWluPTAgcXBtYXg9NjkgcXBzdGVwPTQgaXBfcmF0aW89MS40MCBhcT0xOjEuMDAAgAAAACdliIQP8RigACMbHAAELuOAAJNEnEYoAAimxwABNEjgACWjJ1109eAAAAAGQZo4H+JgAAAABkGaVAf4mAAAAAZBmmA7xMAAAAAGQZqAN8TA';
+let rotMode=null;   // 'applied' | 'ignored' (raw size, raw frame) | 'stretched' (turned size, unturned frame) | 'unknown'
+async function getRotMode(){
+  if(rotMode) return rotMode;
+  try{ const o=localStorage.getItem('splice.rotmode.force'); if(o) return rotMode=o; }catch(e){}
+  const v=document.createElement('video'); v.style.cssText='position:fixed;left:0;top:0;width:8px;height:8px;opacity:.01;pointer-events:none';
+  try{
+    const bin=atob(PROBE_MP4), u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u[i]=bin.charCodeAt(i);
+    v.src=URL.createObjectURL(new Blob([u],{type:'video/mp4'})); document.body.appendChild(v);
+    await readyFrame(v,5000);
+    const vw=v.videoWidth, vh=v.videoHeight, c=document.createElement('canvas'); c.width=vw; c.height=vh; const g=c.getContext('2d',{willReadFrequently:true});
+    g.drawImage(v,0,0,vw,vh);
+    const px=(x,y)=>{ const d=g.getImageData(Math.floor(x),Math.floor(y),1,1).data; return d[0]>d[2]?'red':'blue'; };
+    // the test video is red|blue side by side, tagged "turn 90° clockwise": shown correctly, red ends up on top
+    rotMode= vh>vw ? (px(vw/2,vh*.2)==='red' && px(vw/2,vh*.8)==='blue' ? 'applied' : 'stretched') : 'ignored';
+  }catch(e){ rotMode='unknown'; }
+  finally{ try{ URL.revokeObjectURL(v.src); }catch(e){} v.remove(); }
+  return rotMode;
+}
+// read the rotation tag (tkhd matrix of the picture track) from the start and end of the file
+async function readRotation(blob){
+  const CH=4<<20, parts=[await blob.slice(0,CH).arrayBuffer()]; if(blob.size>CH) parts.push(await blob.slice(Math.max(CH,blob.size-CH)).arrayBuffer());
+  for(const ab of parts){ const u=new Uint8Array(ab), dv=new DataView(ab);
+    for(let i=4;i<u.length-90;i++){ if(u[i]===0x74&&u[i+1]===0x6b&&u[i+2]===0x68&&u[i+3]===0x64){   // 'tkhd'
+      const ver=u[i+4], o=i+8+(ver===1?32:20)+16; if(o+44>u.length) continue;
+      const a=dv.getInt32(o)/65536, b=dv.getInt32(o+4)/65536, w=dv.getUint32(o+36), h=dv.getUint32(o+40);
+      if(!w&&!h) continue;                                         // a sound track: no picture
+      if(Math.abs(a)<.5 && b>.5) return 90; if(a<-.5) return 180; if(Math.abs(a)<.5 && b<-.5) return 270; return 0; } } }
+  return 0;
+}
+const needTurn=m=>m&&m.kind==='video'&&m.metaRot&&(rotMode==='ignored'||rotMode==='stretched');
+// the frame size as it should look, whatever the browser reports
+function shownSize(m,v){ const w=v.videoWidth, h=v.videoHeight; return needTurn(m)&&rotMode==='ignored'&&m.metaRot%180? [h,w] : [w,h]; }
+// draw a video frame the right way up into a box of the shown size
+function drawUpright(g,v,m,x,y,w,h){
+  if(!needTurn(m)){ g.drawImage(v,x,y,w,h); return; }
+  const r=m.metaRot, side=r%180!==0; g.save(); g.translate(x+w/2,y+h/2); g.rotate(r*Math.PI/180);
+  const bw=side?h:w, bh=side?w:h; g.drawImage(v,-bw/2,-bh/2,bw,bh); g.restore();
+}
+async function checkRotation(m){
+  if(m.kind!=='video'||m.metaChecked||!m.blob) return;
+  try{ await getRotMode(); m.metaRot=await readRotation(m.blob); }catch(e){ m.metaRot=0; }
+  m.metaChecked=true;
+  if(needTurn(m) && m.metaRot%180 && rotMode==='ignored' && m.w&&m.h&&m.w>m.h){ const t=m.w; m.w=m.h; m.h=t; }   // portrait shown as portrait
+  if(needTurn(m)){ m.strip=null; m.thumb=null; await makeStrip(m); }                                               // redraw thumbnails upright
+  persistMedia(m); dirty=true;
+}
 async function makeStrip(m){
   try{
     const v=document.createElement('video'); v.muted=true; v.preload='auto'; v.playsInline=true; v.src=m.url;
@@ -1529,8 +1580,8 @@ async function makeStrip(m){
     const c=document.createElement('canvas'); c.width=n*fw; c.height=fh; const g=c.getContext('2d');
     for(let i=0;i<n;i++){
       v.currentTime=Math.min(m.dur-0.05,(i+.5)*m.dur/n); await waitEvt(v,'seeked','error',6000);
-      g.drawImage(v,i*fw,0,fw,fh);
-      if(i===0){ const t=document.createElement('canvas'); t.width=fw*2; t.height=fh*2; t.getContext('2d').drawImage(v,0,0,t.width,t.height); m.thumb=t.toDataURL('image/jpeg',.75); renderBin(); }
+      drawUpright(g,v,m,i*fw,0,fw,fh);
+      if(i===0){ const t=document.createElement('canvas'); t.width=fw*2; t.height=fh*2; drawUpright(t.getContext('2d'),v,m,0,0,t.width,t.height); m.thumb=t.toDataURL('image/jpeg',.75); renderBin(); }
     }
     m.strip=c.toDataURL('image/jpeg',.7); v.removeAttribute('src'); v.load(); renderTL(); renderBin(); persistMedia(m);
   }catch(e){}
@@ -2226,7 +2277,7 @@ function persistMedia(m){
 }
 function mediaMeta(m){
   return {id:m.id,name:m.name,kind:m.kind,chunks:m.chunks,size:m.size,type:m.type,dur:isFinite(m.dur)?m.dur:null,w:m.w,h:m.h,sample:!!m.sample,
-    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null,taken:m.taken||null,takenSrc:m.takenSrc||null,added:m.added||null,rot:m.rot||0,rotUser:!!m.rotUser,orient:m.orient||null,vendChecked:!!m.vendChecked,analysis:m.analysis||null,pixabay:!!m.pixabay,credit:m.credit||null,pageURL:m.pageURL||null};
+    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null,taken:m.taken||null,takenSrc:m.takenSrc||null,added:m.added||null,rot:m.rot||0,rotUser:!!m.rotUser,metaRot:m.metaRot||0,metaChecked:!!m.metaChecked,orient:m.orient||null,vendChecked:!!m.vendChecked,analysis:m.analysis||null,pixabay:!!m.pixabay,credit:m.credit||null,pageURL:m.pageURL||null};
 }
 async function readMediaData(mr){
   if(mr.blob) return mr.blob;                         // saved by an older version: still readable, re-saved in pieces on next change
@@ -2262,7 +2313,7 @@ async function openProject(id){
   let missing=0;
   for(const mid of rec.mediaIds||[]){
     const mr=await DB.get('media',mid).catch(()=>null); const blob=mr&&await readMediaData(mr).catch(()=>null); if(!blob){ missing++; continue; } mr.blob=blob;
-    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave,taken:mr.taken||null,takenSrc:mr.takenSrc||null,added:mr.added||0,rot:mr.rot||0,rotUser:!!mr.rotUser,orient:mr.orient||null,blobSaved:!!mr.chunks,chunks:mr.chunks,size:mr.size,type:mr.type,vendChecked:!!mr.vendChecked,analysis:mr.analysis||null,pixabay:!!mr.pixabay,credit:mr.credit||null,pageURL:mr.pageURL||null};
+    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave,taken:mr.taken||null,takenSrc:mr.takenSrc||null,added:mr.added||0,rot:mr.rot||0,rotUser:!!mr.rotUser,metaRot:mr.metaRot||0,metaChecked:!!mr.metaChecked,orient:mr.orient||null,blobSaved:!!mr.chunks,chunks:mr.chunks,size:mr.size,type:mr.type,vendChecked:!!mr.vendChecked,analysis:mr.analysis||null,pixabay:!!mr.pixabay,credit:mr.credit||null,pageURL:mr.pageURL||null};
     try{
       if(m.kind==='image'){ const img=new Image(); img.src=m.url; await img.decode(); m.img=img; m.w=img.naturalWidth; m.h=img.naturalHeight; m.thumb=m.url; m.dur=Infinity; }
       else if(m.kind==='video' && !m.strip) makeStrip(m).then(()=>persistMedia(m));
@@ -2273,7 +2324,7 @@ async function openProject(id){
   P=rec.P; curId=rec.id; curCreated=rec.created; $('#projName').value=rec.name; T=clamp(rec.T||0,0,1e9);
   applyAspect(false); commit(); loadingProj=false; lsSet('splice.last',curId);
   renderAll(); renderLeft(); requestAnimationFrame(()=>fitZoom()); setSaveState('Saved');
-  (async()=>{ for(const m of Object.values(media)) if(m.kind==='video' && !m.vendChecked) await probeVideoEnd(m); })();
+  (async()=>{ await getRotMode(); for(const m of Object.values(media)) if(m.kind==='video'){ await checkRotation(m); if(!m.vendChecked) await probeVideoEnd(m); } })();
   if(missing) toast(`${missing} media file${missing>1?'s':''} couldn’t be loaded from this device`);
 }
 async function newProject(){
@@ -2431,7 +2482,9 @@ function upScores(src,sw,sh){
   return {0:s(t,bo),90:side?s(l,r):0,180:flat?s(bo,t):0,270:side?s(r,l):0};
 }
 async function detectUp(m){
-  if(m.orient && m.orient.v===4) return m.orient;
+  await checkRotation(m);
+  if(m.orient && m.orient.v===5) return m.orient;
+  if(m.orient && !m.rotUser) m.rot=0;      // an earlier automatic turn may have been based on an unturned picture: start again
   const votes={0:0,90:0,180:0,270:0}; let frames=0;
   const tally=sc=>{ const k=Object.keys(sc).sort((a,b)=>sc[b]-sc[a]); const best=k[0], second=sc[k[1]];
     frames++;
@@ -2441,13 +2494,14 @@ async function detectUp(m){
   else {
     const v=document.createElement('video'); v.src=m.url; v.style.cssText='position:fixed;left:0;top:0;width:4px;height:4px;opacity:.01;pointer-events:none'; document.body.appendChild(v);
     try{ await readyFrame(v,12000); const n=Math.min(8,Math.max(3,Math.round(m.dur/4)));
-      for(let k=0;k<n;k++){ v.currentTime=Math.min(m.dur-.1,(k+.5)*m.dur/n); await waitEvt(v,'seeked','error',6000).catch(()=>{}); if(v.readyState>=2) tally(upScores(v,v.videoWidth,v.videoHeight)); } }
+      const [sw2,sh2]=shownSize(m,v), uc=document.createElement('canvas'); uc.width=Math.round(64*Math.min(1,sw2/sh2)); uc.height=Math.round(64*Math.min(1,sh2/sw2)); const ug=uc.getContext('2d');
+      for(let k=0;k<n;k++){ v.currentTime=Math.min(m.dur-.1,(k+.5)*m.dur/n); await waitEvt(v,'seeked','error',6000).catch(()=>{}); if(v.readyState>=2){ drawUpright(ug,v,m,0,0,uc.width,uc.height); tally(upScores(uc,uc.width,uc.height)); } } }
     catch(e){} finally{ v.removeAttribute('src'); v.load(); v.remove(); }
   }
   // decide: a turn needs a clear majority of the frames, not just a slight lean
   const need=m.kind==='image'?1:Math.max(2,Math.ceil(frames*.6));
   let rot=0; for(const k of [90,180,270]) if(votes[k]>=need && votes[k]>votes[0]*2) rot=+k;
-  m.orient={v:4,rot,votes,frames}; persistMedia(m); return m.orient;
+  m.orient={v:5,rot,votes,frames}; persistMedia(m); return m.orient;
 }
 
 /* ---- 2. find the beat of the song ---- */
@@ -2563,6 +2617,7 @@ async function buildAutoEdit(opts,ui){
   if(opts.upright!==false){
     ui.step('Checking which way up each shot is');
     for(const m of [...vids,...photos]){ if(run.cancel) return null; if(m.rotUser) continue;
+      if(m.kind==='video'){ await checkRotation(m); if(m.metaRot){ if(m.orient&&m.rot&&!m.rotUser){ m.rot=0; persistMedia(m); } continue; } }   // the phone recorded how it was held: trust it
       try{ const o=await detectUp(m); if(o.rot && (m.rot||0)!==o.rot){ m.rot=o.rot; persistMedia(m); turned.push(m); } }catch(e){} }
   }
   // B-roll
@@ -2729,6 +2784,7 @@ $('#autoBtn').onclick=openAuto;
 /* ---------------- boot ---------------- */
 (async()=>{
   applyAspect(false); renderLeft();
+  getRotMode().then(()=>{ dirty=true; });
   requestAnimationFrame(loop);
   if(document.fonts){ FONTS.forEach(f=>document.fonts.load(`${f.w} 40px ${f.fam}`).then(()=>{dirty=true}).catch(()=>{})); document.fonts.load('italic 400 40px "Instrument Serif"').catch(()=>{}); document.fonts.ready.then(()=>{dirty=true}); }
   try{ await DB.open(); dbOK=true; }catch(e){ dbOK=false; setSaveState('Not saving'); }
