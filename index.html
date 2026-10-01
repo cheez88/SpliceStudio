@@ -1924,7 +1924,7 @@ insp.addEventListener('click',e=>{
     const o=selObj(); if(!o) return; const same=P.clips.filter(c=>c.mediaId===o.mediaId);
     const nr=((o.rot||0)+(act==='rotL'?-90:act==='rotR'?90:0)+360)%360, fh=act==='flipH'?!o.flipH:!!o.flipH, fv=act==='flipV'?!o.flipV:!!o.flipV;
     same.forEach(c=>{ c.rot=nr; c.flipH=fh; c.flipV=fv; });
-    if(act==='rotL'||act==='rotR'){ const m=media[o.mediaId]; if(m){ m.rot=nr; persistMedia(m); } }
+    if(act==='rotL'||act==='rotR'||act==='flipH'||act==='flipV'){ const m=media[o.mediaId]; if(m){ if(act==='rotL'||act==='rotR') m.rot=nr; m.rotUser=true; persistMedia(m); } }
     commit(); renderTL(); renderBin(); renderInspector(); dirty=true;
   }
   else if(act==='auto'){
@@ -2226,7 +2226,7 @@ function persistMedia(m){
 }
 function mediaMeta(m){
   return {id:m.id,name:m.name,kind:m.kind,chunks:m.chunks,size:m.size,type:m.type,dur:isFinite(m.dur)?m.dur:null,w:m.w,h:m.h,sample:!!m.sample,
-    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null,taken:m.taken||null,takenSrc:m.takenSrc||null,added:m.added||null,rot:m.rot||0,vendChecked:!!m.vendChecked,analysis:m.analysis||null,pixabay:!!m.pixabay,credit:m.credit||null,pageURL:m.pageURL||null};
+    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null,taken:m.taken||null,takenSrc:m.takenSrc||null,added:m.added||null,rot:m.rot||0,rotUser:!!m.rotUser,orient:m.orient||null,vendChecked:!!m.vendChecked,analysis:m.analysis||null,pixabay:!!m.pixabay,credit:m.credit||null,pageURL:m.pageURL||null};
 }
 async function readMediaData(mr){
   if(mr.blob) return mr.blob;                         // saved by an older version: still readable, re-saved in pieces on next change
@@ -2262,7 +2262,7 @@ async function openProject(id){
   let missing=0;
   for(const mid of rec.mediaIds||[]){
     const mr=await DB.get('media',mid).catch(()=>null); const blob=mr&&await readMediaData(mr).catch(()=>null); if(!blob){ missing++; continue; } mr.blob=blob;
-    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave,taken:mr.taken||null,takenSrc:mr.takenSrc||null,added:mr.added||0,rot:mr.rot||0,blobSaved:!!mr.chunks,chunks:mr.chunks,size:mr.size,type:mr.type,vendChecked:!!mr.vendChecked,analysis:mr.analysis||null,pixabay:!!mr.pixabay,credit:mr.credit||null,pageURL:mr.pageURL||null};
+    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave,taken:mr.taken||null,takenSrc:mr.takenSrc||null,added:mr.added||0,rot:mr.rot||0,rotUser:!!mr.rotUser,orient:mr.orient||null,blobSaved:!!mr.chunks,chunks:mr.chunks,size:mr.size,type:mr.type,vendChecked:!!mr.vendChecked,analysis:mr.analysis||null,pixabay:!!mr.pixabay,credit:mr.credit||null,pageURL:mr.pageURL||null};
     try{
       if(m.kind==='image'){ const img=new Image(); img.src=m.url; await img.decode(); m.img=img; m.w=img.naturalWidth; m.h=img.naturalHeight; m.thumb=m.url; m.dur=Infinity; }
       else if(m.kind==='video' && !m.strip) makeStrip(m).then(()=>persistMedia(m));
@@ -2340,7 +2340,7 @@ window.addEventListener('pagehide',()=>saveNow());
 const PACE={relaxed:{name:'Relaxed',len:5,min:3,max:7.5,every:3,cut:'fade',mood:'acoustic'},
             balanced:{name:'Balanced',len:3.2,min:2,max:5,every:3,cut:'none',mood:'upbeat'},
             fast:{name:'Fast',len:1.9,min:1.1,max:3,every:4,cut:'none',mood:'energetic sport'}};
-const AUTO={pace:'balanced',len:60,music:'',broll:true,px:false,pxQ:'',title:true,style:'keep',marks:true};
+const AUTO={pace:'balanced',len:60,music:'',broll:true,px:false,pxQ:'',title:true,style:'keep',marks:true,upright:true};
 try{ const s=JSON.parse(localStorage.getItem('splice.auto')||'{}'); Object.assign(AUTO,s); }catch(e){}
 const pxKey=()=>{ try{ return localStorage.getItem('splice.pxkey')||''; }catch(e){ return ''; } };
 let autoRun=null;
@@ -2405,6 +2405,49 @@ async function analyseVideoMedia(m,onProg,run){
     A.motion.push(avg('diff')); A.sharp.push(avg('sharp')); A.bright.push(avg('y')); A.sat.push(avg('sat')); }
   S.forEach(x=>{ if(x.diff>Math.max(.12,med*6)) A.cuts.push(+x.t.toFixed(2)); });
   m.analysis=A; persistMedia(m); return A;
+}
+
+/* ---- which way is up? ----
+   Files that record how the phone was held already show the right way up. This is for shots where the picture
+   itself is sideways (rotation lock, phone held flat). It reads the scene the way an editor would: light and sky
+   at the top, grass and ground at the bottom, and only turns a shot when that's clear in most of its frames. */
+function upScores(src,sw,sh){
+  const N=48, c=document.createElement('canvas'); c.width=N; c.height=N; const g=c.getContext('2d',{willReadFrequently:true});
+  g.drawImage(src,0,0,N,N); const d=g.getImageData(0,0,N,N).data;
+  const band=(x0,y0,x1,y1)=>{ let L=0,B=0,G=0,n=0; for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const i=(y*N+x)*4, r=d[i], gg=d[i+1], b=d[i+2];
+      L+=.299*r+.587*gg+.114*b; B+=b-(r+gg)/2; G+=gg-(r+b)/2; n++; } return {L:L/n/255,B:B/n/255,G:G/n/255}; };
+  const t=band(0,0,N,N/3), bo=band(0,N*2/3,N,N), l=band(0,0,N/3,N), r=band(N*2/3,0,N,N);
+  // brighter above; blue above only counts as sky when it's also bright (water and shadow are blue but dark); greener below.
+  // A direction only scores if "brighter above" agrees, so side-to-side colour (a test card, a painted wall) can't turn a shot.
+  // blue only ever counts *for* a sky (sunset and overcast skies aren't blue, and that mustn't count against them)
+  const s=(top,bot)=>{ const dL=top.L-bot.L, dB=Math.max(0,top.B)*top.L-Math.max(0,bot.B)*bot.L, dG=bot.G-top.G; if(dL<.03) return Math.min(0,dL); return dL*1.2+dB*2.4+dG*1.6; };
+  // a real scene changes most from top to bottom (sky, horizon, ground). Only call a shot sideways if its main
+  // light-to-dark change runs side to side; a bright window on one side of an upright shot won't pass this.
+  const rows=[],cols=[]; for(let y=0;y<N;y++){ let a=0; for(let x=0;x<N;x++){ const i=(y*N+x)*4; a+=.299*d[i]+.587*d[i+1]+.114*d[i+2]; } rows.push(a/N); }
+  for(let x=0;x<N;x++){ let a=0; for(let y=0;y<N;y++){ const i=(y*N+x)*4; a+=.299*d[i]+.587*d[i+1]+.114*d[i+2]; } cols.push(a/N); }
+  const vr=a=>{ const m=a.reduce((p,q)=>p+q,0)/a.length; return a.reduce((p,q)=>p+(q-m)*(q-m),0)/a.length; }, an=vr(cols)/(vr(rows)+1e-6);
+  const side=an>1.2, flat=an<.85;
+  // rotating clockwise by 90 brings the left edge to the top; by 270 the right edge
+  return {0:s(t,bo),90:side?s(l,r):0,180:flat?s(bo,t):0,270:side?s(r,l):0};
+}
+async function detectUp(m){
+  if(m.orient && m.orient.v===4) return m.orient;
+  const votes={0:0,90:0,180:0,270:0}; let frames=0;
+  const tally=sc=>{ const k=Object.keys(sc).sort((a,b)=>sc[b]-sc[a]); const best=k[0], second=sc[k[1]];
+    frames++;
+    if(sc[0]>.06){ votes[0]++; return; }      // already looks upright (lighter above than below): never turn it
+    if(sc[best]>.08 && sc[best]-Math.max(second,0)>.06) votes[best]++; };
+  if(m.kind==='image'){ if(m.img) tally(upScores(m.img,m.w,m.h)); }
+  else {
+    const v=document.createElement('video'); v.src=m.url; v.style.cssText='position:fixed;left:0;top:0;width:4px;height:4px;opacity:.01;pointer-events:none'; document.body.appendChild(v);
+    try{ await readyFrame(v,12000); const n=Math.min(8,Math.max(3,Math.round(m.dur/4)));
+      for(let k=0;k<n;k++){ v.currentTime=Math.min(m.dur-.1,(k+.5)*m.dur/n); await waitEvt(v,'seeked','error',6000).catch(()=>{}); if(v.readyState>=2) tally(upScores(v,v.videoWidth,v.videoHeight)); } }
+    catch(e){} finally{ v.removeAttribute('src'); v.load(); v.remove(); }
+  }
+  // decide: a turn needs a clear majority of the frames, not just a slight lean
+  const need=m.kind==='image'?1:Math.max(2,Math.ceil(frames*.6));
+  let rot=0; for(const k of [90,180,270]) if(votes[k]>=need && votes[k]>votes[0]*2) rot=+k;
+  m.orient={v:4,rot,votes,frames}; persistMedia(m); return m.orient;
 }
 
 /* ---- 2. find the beat of the song ---- */
@@ -2515,6 +2558,13 @@ async function buildAutoEdit(opts,ui){
     if(run.cancel) return null; doneSecs+=m.dur;
   }
   ui.prog(.82);
+  // turn sideways or upside-down shots the right way up (never overriding a turn you made yourself)
+  const turned=[];
+  if(opts.upright!==false){
+    ui.step('Checking which way up each shot is');
+    for(const m of [...vids,...photos]){ if(run.cancel) return null; if(m.rotUser) continue;
+      try{ const o=await detectUp(m); if(o.rot && (m.rot||0)!==o.rot){ m.rot=o.rot; persistMedia(m); turned.push(m); } }catch(e){} }
+  }
   // B-roll
   let pxClips=[];
   if(opts.px && pxKey() && opts.pxQ.trim()){
@@ -2590,7 +2640,7 @@ async function buildAutoEdit(opts,ui){
   if(song){ const d=Math.min(song.dur,vlen); P.audio.push({id:uid(),mediaId:song.id,start:0,in:0,out:d,volume:.9,fadeIn:.4,fadeOut:Math.min(3,d/4)}); }
   T=0; applyAspect(false); commit(); await saveNow(); renderAll(); renderLeft(); requestAnimationFrame(()=>fitZoom());
   const usedVids=new Set(seq.filter(x=>!x.broll&&!x.photo).map(x=>x.m.id)).size;
-  return {len:vlen, moments:seq.filter(x=>!x.broll).length, videos:usedVids, broll:seq.filter(x=>x.broll).length, px:pxClips, song:song?song.name:null, bpm:beat?beat.bpm:null, origId,
+  return {turned:turned.map(m=>m.name), len:vlen, moments:seq.filter(x=>!x.broll).length, videos:usedVids, broll:seq.filter(x=>x.broll).length, px:pxClips, song:song?song.name:null, bpm:beat?beat.bpm:null, origId,
           footage:Math.round(totalSecs)};
 }
 
@@ -2618,7 +2668,8 @@ function openAuto(){
         <input class="lblin" id="autoPxQ" placeholder="What to search for, e.g. soccer stadium" value="${esc(AUTO.pxQ)}" maxlength="60">
         <input class="lblin" id="autoPxKey" placeholder="Your free Pixabay API key" value="${esc(pxKey())}" autocomplete="off" spellcheck="false">
         <p class="note" style="margin:0">${hasKey?'Key saved on this device only.':'Get a free key: sign in at Pixabay and open'} <a href="https://pixabay.com/api/docs/" target="_blank" rel="noopener">pixabay.com/api/docs</a>${hasKey?'':'. It’s shown near the top as “key”. Saved on this device only.'}</p></div>`)}
-    ${field('Extras',`<label class="chk"><input type="checkbox" id="autoTitle"${AUTO.title?' checked':''}> Opening title using the project name</label>
+    ${field('Extras',`<label class="chk"><input type="checkbox" id="autoUpright"${AUTO.upright!==false?' checked':''}> Turn sideways or upside-down shots the right way up</label>
+      <label class="chk"><input type="checkbox" id="autoTitle"${AUTO.title?' checked':''}> Opening title using the project name</label>
       ${(P.marks||[]).length?`<label class="chk"><input type="checkbox" id="autoMarks"${AUTO.marks?' checked':''}> Always include my ${P.marks.length} highlight${P.marks.length===1?'':'s'}</label>`:''}
       <select id="autoStyle" class="lblin"><option value="keep">Keep this project’s look</option>${STYLES.map(s=>`<option value="${s.id}"${AUTO.style===s.id?' selected':''}>Style: ${s.name}</option>`).join('')}</select>`)}
     <div class="mfoot"><button class="btn ghost" data-autoclose>Cancel</button><button class="btn primary" id="autoGo"${!vids.length&&!photos.length?' disabled':''}>${ICON.spark}Create my video</button></div>`;
@@ -2627,7 +2678,7 @@ function openAuto(){
 function readAutoForm(){
   const q=id=>document.getElementById(id);
   AUTO.music=q('autoMusic')?q('autoMusic').value:''; AUTO.broll=!!(q('autoBroll')&&q('autoBroll').checked); AUTO.px=!!(q('autoPx')&&q('autoPx').checked);
-  AUTO.pxQ=q('autoPxQ')?q('autoPxQ').value:AUTO.pxQ; AUTO.title=!!(q('autoTitle')&&q('autoTitle').checked); AUTO.marks=q('autoMarks')?q('autoMarks').checked:AUTO.marks;
+  AUTO.pxQ=q('autoPxQ')?q('autoPxQ').value:AUTO.pxQ; AUTO.title=!!(q('autoTitle')&&q('autoTitle').checked); AUTO.upright=!!(q('autoUpright')&&q('autoUpright').checked); AUTO.marks=q('autoMarks')?q('autoMarks').checked:AUTO.marks;
   AUTO.style=q('autoStyle')?q('autoStyle').value:'keep';
   const k=q('autoPxKey'); if(k){ try{ const v=k.value.trim(); v?localStorage.setItem('splice.pxkey',v):localStorage.removeItem('splice.pxkey'); }catch(e){} }
   try{ const {_touched,...s}=AUTO; localStorage.setItem('splice.auto',JSON.stringify(s)); }catch(e){}
@@ -2655,6 +2706,7 @@ async function startAuto(){
     <div class="stat">Best moments<b>${r.moments}${r.videos?` from ${r.videos} video${r.videos===1?'':'s'}`:''}</b></div>
     ${r.footage?`<div class="stat">From footage<b>${fmtD(r.footage)}</b></div>`:''}
     <div class="stat">B-roll shots<b>${r.broll}</b></div>
+    ${r.turned&&r.turned.length?`<div class="stat">Turned the right way up<b>${r.turned.length} shot${r.turned.length===1?'':'s'}</b></div><p class="note" style="margin:0">${r.turned.map(n=>esc(n)).join(', ')}. If one\u2019s wrong, select it and use Left or Right in Orientation.</p>`:''}
     <div class="stat">Music<b>${r.song?esc(r.song)+(r.bpm?` · cut to ${r.bpm} BPM`:''):'Original sound'}</b></div>
     ${r.px.length?`<p class="note" style="margin:0">B-roll from Pixabay by ${[...new Set(r.px.map(m=>m.credit))].map(u=>esc(u)).join(', ')}. <a href="https://pixabay.com/" target="_blank" rel="noopener">pixabay.com</a></p>`:''}
     ${notes.map(n=>`<p class="note" style="margin:0;color:#ffb070">${esc(n)}</p>`).join('')}
