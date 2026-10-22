@@ -762,7 +762,7 @@ function syncMedia(){
     // iPhone lets only one video with sound play at a time: only the clip on screen is unmuted; the other one in a
     // transition, and any clip warming up, play muted so they never pause each other
     const mute=!(mc && mc.id===c.id); if(el.muted!==mute && !r.priming) el.muted=mute;
-    if(el.readyState<3 && (!playing || (local<0 && local>-6))) prime(r);   // warm up upcoming clips, even while paused, so the first cuts are instant too
+    if(el.readyState<3 && (playing ? (local<0 && local>-6) : (mix===undefined || el.readyState<2))) prime(r);   // warm up upcoming clips, even while paused, so the first cuts are instant too
     if(r.priming) continue;
     // pre-roll: start the next clip a moment before its cut (silently, or fading in during a transition) so it's already
     // moving when it appears; post-roll: the outgoing clip keeps moving through a transition instead of freezing
@@ -1073,7 +1073,11 @@ function unlockVideos(){
     el.muted=false; const pr=el.play(); if(pr) pr.then(()=>{ if(!r.clipId&&r.video){ el.pause(); } }).catch(()=>{}); el.muted=was; }
 }
 function togglePlay(){ ensureAudio(); if(!playing) unlockVideos(); if(playing&&loopRange){ loopRange=null; setPlaying(false); renderInspector(); return; } if(!playing && T>=total()-0.02) T=0; setPlaying(!playing); }
-function seek(t){ T=clamp(t,0,total()); if(playing){ playT0=T; playW0=performance.now(); } dirty=true; syncMedia(); }
+function seek(t){ T=clamp(t,0,total()); if(playing){ playT0=T; playW0=performance.now(); resyncAudio(); } dirty=true; syncMedia(); }
+// after a jump, put every song at the new spot straight away, and let the picture keep time until they've landed
+let audioGrace=0;
+function resyncAudio(){ audioGrace=performance.now()+400;
+  for(const a of P.audio){ const r=els.get(a.id); if(!r) continue; const local=T-a.start; if(local>=0 && local<a.out-a.in) try{ r.el.currentTime=a.in+local; }catch(e){} } }
 const fmtTC=t=>{ t=Math.max(0,t); const m=Math.floor(t/60), s=Math.floor(t%60), f=Math.floor((t%1)*FPS+1e-6); return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(f).padStart(2,'0')}`; };
 const fmtD=s=>s<60?`${s.toFixed(1)}s`:`${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}`;
 let lastTC='';
@@ -1113,7 +1117,7 @@ function loop(now){
     let t=playT0+(now-playW0)/1000;
     masterId=null; masterAudio=null;
     // music is what people notice skipping, so when a song is playing it keeps time and the pictures follow it
-    const am=audioMaster();
+    const am=now<audioGrace?null:audioMaster();
     const mc=am?null:pickMaster(), r=mc&&slotOf(mc.id);
     if(am){ const lt=am.a.start+(am.r.el.currentTime-am.a.in); if(Math.abs(lt-t)<1.5){ t=Math.max(T,lt); masterAudio=am.a.id; } playT0=t; playW0=now; holdSince=0; }
     else if(r && !r.el.paused){
@@ -1126,7 +1130,7 @@ function loop(now){
     // if frames are taking too long, simplify the preview (grain, soft-blur) so motion stays smooth; export is unaffected
     if(dt<250){ frameAvg=frameAvg*.94+dt*.06; if(!lowFx && !exporting && frameAvg>30 && T>1){ lowFx=true; toast('Preview simplified to keep playback smooth. Your export keeps full quality.'); } }
     const tot=total();
-    if(loopRange && !exporting && T>=loopRange.e){ T=loopRange.s; playT0=T; playW0=now; syncMedia(); }
+    if(loopRange && !exporting && T>=loopRange.e){ T=loopRange.s; playT0=T; playW0=now; resyncAudio(); syncMedia(); }
     else if(T>=tot){ T=tot; setPlaying(false); if(exporting) finishRecording(); }
     else if(exporting) updExportProgress();
     const tls=$('#tls'), x=headW()+T*pps;
@@ -1446,7 +1450,7 @@ function splitAt(){
   sel={type:target.type,id:n.id}; commit(); renderAll(); toast('Split');
 }
 function deleteSel(){
-  if(!sel) return; const o=selObj(); if(!o) return;
+  if(!sel){ toast('Select a clip, text or sound first'); return; } const o=selObj(); if(!o) return;
   if(sel.type==='trans'){ o.tr={type:'none',dur:o.tr?o.tr.dur:.5}; }
   else if(sel.type==='clip') P.clips=P.clips.filter(c=>c!==o);
   else if(sel.type==='text') P.texts=P.texts.filter(c=>c!==o);
@@ -1455,7 +1459,7 @@ function deleteSel(){
   sel=null; commit(); renderAll(); if(ltab==='marks') renderMarks(); if(T>total()) seek(total());
 }
 function duplicateSel(){
-  const o=selObj(); if(!o||sel.type==='trans') return; const n=JSON.parse(JSON.stringify(o)); n.id=uid();
+  const o=selObj(); if(!o||sel.type==='trans'){ toast('Select a clip, text or sound to duplicate'); return; } const n=JSON.parse(JSON.stringify(o)); n.id=uid();
   if(sel.type==='clip') P.clips.splice(P.clips.indexOf(o)+1,0,n);
   else if(sel.type==='text'){ n.start=o.start+o.dur; P.texts.push(n); }
   else { n.start=o.start+(o.out-o.in); P.audio.push(n); }
@@ -2072,7 +2076,8 @@ function onRecStop(){
   const ex=exporting; exporting=null; if(spk) spk.gain.value=1; applyAspect(false);
   if(!ex||ex.cancel){ $('#exportModal').hidden=true; toast('Export cancelled'); return; }
   const type=ex.mime.split(';')[0], ext=type==='video/mp4'?'mp4':'webm';
-  lastBlob=new Blob(chunks,{type}); const url=URL.createObjectURL(lastBlob);
+  if(window.__exURL) try{ URL.revokeObjectURL(window.__exURL); }catch(e){}
+  lastBlob=new Blob(chunks,{type}); const url=window.__exURL=URL.createObjectURL(lastBlob);
   const name=(($('#projName').value||'Splice edit').replace(/[^\w\- ]+/g,'').trim()||'Splice edit')+'.'+ext;
   $('#exBody').innerHTML=`<div style="display:grid;gap:12px"><video id="outVid" src="${url}" controls playsinline></video>
     <div class="stat">File<b>${esc(name)} · ${(lastBlob.size/1048576).toFixed(1)} MB</b></div>
@@ -2088,6 +2093,7 @@ async function saveBlob(blob,name){
     return;
   }
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>{ try{ URL.revokeObjectURL(a.href); }catch(e){} },60000);
   toast('Download started');
 }
 $('#exportBtn').onclick=openExport;
@@ -2380,7 +2386,7 @@ $('#projModal').addEventListener('click',async e=>{
     else { x.dataset.armed=Date.now(); x.classList.add('armed'); x.innerHTML=`${ICON.trash}<span>Delete for good?</span>`; } }
 });
 $('#projName').addEventListener('input',scheduleSave);
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') saveNow(); });
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden'){ if(playing && !exporting){ setPlaying(false); loopRange=null; } saveNow(); } });
 window.addEventListener('pagehide',()=>saveNow());
 
 /* ======================= AUTO EDIT =======================
