@@ -500,6 +500,13 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 <input type="file" id="file" multiple accept="video/*,audio/*,image/*,.mov,.mp4,.m4v,.webm,.avi,.wmv,.asf,.mkv,.flv,.f4v,.mpg,.mpeg,.m2v,.mpe,.vob,.ts,.mts,.m2ts,.ogv,.3gp,.3g2,.dv,.mxf,.divx,.rm,.rmvb,.hevc,.wma,.amr,.ac3,.eac3,.mka,.mp2,.aifc,.au,.wv,.ape,.dts,.jpg,.jpeg,.png,.heic,.webp,.gif,.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,.ogg,.oga,.opus,.m4b" hidden>
 <input type="file" id="fileAudio" multiple accept="audio/*,.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,.ogg,.oga,.opus,.m4b,.wma,.amr,.ac3,.eac3,.mka,.mp2,.aifc,.au,.wv,.ape,.dts" hidden>
 
+<script>/* mp4-muxer 5.1.3 · MIT License · Copyright (c) 2023 Vanilagy · github.com/Vanilagy/mp4-muxer */
+"use strict";var Mp4Muxer=(()=>{var we=Object.defineProperty,nt=Object.getOwnPropertyDescriptor,ot=Object.getOwnPropertyNames,ht=Object.prototype.hasOwnProperty,lt=(e,t)=>{for(var s in t)we(e,s,{get:t[s],enumerable:!0})},ft=(e,t,s,r)=>{if(t&&typeof t=="object"||typeof t=="function")for(let a of ot(t))!ht.call(e,a)&&a!==s&&we(e,a,{get:()=>t[a],enumerable:!(r=nt(t,a))||r.enumerable});return e},ut=e=>ft(we({},"__esModule",{value:!0}),e),ve=(e,t,s)=>{if(!t.has(e))throw TypeError("Cannot "+s)},i=(e,t,s)=>(ve(e,t,"read from private field"),s?s.call(e):t.get(e)),d=(e,t,s)=>{if(t.has(e))throw TypeError("Cannot add the same private member more than once");t instanceof WeakSet?t.add(e):t.set(e,s)},y=(e,t,s,r)=>(ve(e,t,"write to private field"),r?r.call(e,s):t.set(e,s),s),dt=(e,t,s,r)=>({set _(a){y(e,t,a,s)},get _(){return i(e,t,r)}}),m=(e,t,s)=>(ve(e,t,"access private method"),s),Re={};lt(Re,{ArrayBufferTarget:()=>qe,FileSystemWritableFileStreamTarget:()=>Xe,Muxer:()=>pi,StreamTarget:()=>Se});var p=new Uint8Array(8),O=new DataView(p.buffer),C=e=>[(e%256+256)%256],c=e=>(O.setUint16(0,e,!1),[p[0],p[1]]),mt=e=>(O.setInt16(0,e,!1),[p[0],p[1]]),Pe=e=>(O.setUint32(0,e,!1),[p[1],p[2],p[3]]),n=e=>(O.setUint32(0,e,!1),[p[0],p[1],p[2],p[3]]),pt=e=>(O.setInt32(0,e,!1),[p[0],p[1],p[2],p[3]]),x=e=>(O.setUint32(0,Math.floor(e/2**32),!1),O.setUint32(4,e,!1),[p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]]),ge=e=>(O.setInt16(0,2**8*e,!1),[p[0],p[1]]),A=e=>(O.setInt32(0,2**16*e,!1),[p[0],p[1],p[2],p[3]]),ye=e=>(O.setInt32(0,2**30*e,!1),[p[0],p[1],p[2],p[3]]),z=(e,t=!1)=>{let s=Array(e.length).fill(null).map((r,a)=>e.charCodeAt(a));return t&&s.push(0),s},te=e=>e&&e[e.length-1],Ce=e=>{let t;for(let s of e)(!t||s.presentationTimestamp>t.presentationTimestamp)&&(t=s);return t},B=(e,t,s=!0)=>{let r=e*t;return s?Math.round(r):r},Le=e=>{let t=e*(Math.PI/180),s=Math.cos(t),r=Math.sin(t);return[s,r,0,-r,s,0,0,0,1]},Ve=Le(0),je=e=>[A(e[0]),A(e[1]),ye(e[2]),A(e[3]),A(e[4]),ye(e[5]),A(e[6]),A(e[7]),ye(e[8])],X=e=>!e||typeof e!="object"?e:Array.isArray(e)?e.map(X):Object.fromEntries(Object.entries(e).map(([t,s])=>[t,X(s)])),V=e=>e>=0&&e<2**32,g=(e,t,s)=>({type:e,contents:t&&new Uint8Array(t.flat(10)),children:s}),w=(e,t,s,r,a)=>g(e,[C(t),Pe(s),r??[]],a),ct=e=>{let t=512;return e.fragmented?g("ftyp",[z("iso5"),n(t),z("iso5"),z("iso6"),z("mp41")]):g("ftyp",[z("isom"),n(t),z("isom"),e.holdsAvc?z("avc1"):[],z("mp41")])},Te=e=>({type:"mdat",largeSize:e}),wt=e=>({type:"free",size:e}),ie=(e,t,s=!1)=>g("moov",null,[vt(t,e),...e.map(r=>gt(r,t)),s?Ht(e):null]),vt=(e,t)=>{let s=B(Math.max(0,...t.filter(l=>l.samples.length>0).map(l=>{const u=Ce(l.samples);return u.presentationTimestamp+u.duration})),Oe),r=Math.max(...t.map(l=>l.id))+1,a=!V(e)||!V(s),o=a?x:n;return w("mvhd",+a,0,[o(e),o(e),n(Oe),o(s),A(1),ge(1),Array(10).fill(0),je(Ve),Array(24).fill(0),n(r)])},gt=(e,t)=>g("trak",null,[yt(e,t),Ct(e,t)]),yt=(e,t)=>{let s=Ce(e.samples),r=B(s?s.presentationTimestamp+s.duration:0,Oe),a=!V(t)||!V(r),o=a?x:n,l;return e.info.type==="video"?l=typeof e.info.rotation=="number"?Le(e.info.rotation):e.info.rotation:l=Ve,w("tkhd",+a,3,[o(t),o(t),n(e.id),n(0),o(r),Array(8).fill(0),c(0),c(0),ge(e.info.type==="audio"?1:0),c(0),je(l),A(e.info.type==="video"?e.info.width:0),A(e.info.type==="video"?e.info.height:0)])},Ct=(e,t)=>g("mdia",null,[Tt(e,t),St(e.info.type==="video"?"vide":"soun"),bt(e)]),Tt=(e,t)=>{let s=Ce(e.samples),r=B(s?s.presentationTimestamp+s.duration:0,e.timescale),a=!V(t)||!V(r),o=a?x:n;return w("mdhd",+a,0,[o(t),o(t),n(e.timescale),o(r),c(21956),c(0)])},St=e=>w("hdlr",0,0,[z("mhlr"),z(e),n(0),n(0),n(0),z("mp4-muxer-hdlr",!0)]),bt=e=>g("minf",null,[e.info.type==="video"?_t():kt(),zt(),At(e)]),_t=()=>w("vmhd",0,1,[c(0),c(0),c(0),c(0)]),kt=()=>w("smhd",0,0,[c(0),c(0)]),zt=()=>g("dinf",null,[Et()]),Et=()=>w("dref",0,0,[n(1)],[Ot()]),Ot=()=>w("url ",0,1),At=e=>{const t=e.compositionTimeOffsetTable.length>1||e.compositionTimeOffsetTable.some(s=>s.sampleCompositionTimeOffset!==0);return g("stbl",null,[Bt(e),Rt(e),Pt(e),Lt(e),Vt(e),jt(e),t?$t(e):null])},Bt=e=>w("stsd",0,0,[n(1)],[e.info.type==="video"?Mt(ti[e.info.codec],e):Wt(si[e.info.codec],e)]),Mt=(e,t)=>g(e,[Array(6).fill(0),c(1),c(0),c(0),Array(12).fill(0),c(t.info.width),c(t.info.height),n(4718592),n(4718592),n(0),c(1),Array(32).fill(0),c(24),mt(65535)],[ii[t.info.codec](t)]),It=e=>e.info.decoderConfig&&g("avcC",[...new Uint8Array(e.info.decoderConfig.description)]),Dt=e=>e.info.decoderConfig&&g("hvcC",[...new Uint8Array(e.info.decoderConfig.description)]),Ut=e=>{if(!e.info.decoderConfig)return null;let t=e.info.decoderConfig;if(!t.colorSpace)throw new Error("'colorSpace' is required in the decoder config for VP9.");let s=t.codec.split("."),r=Number(s[1]),a=Number(s[2]),u=(Number(s[3])<<4)+(0<<1)+Number(t.colorSpace.fullRange);return w("vpcC",1,0,[C(r),C(a),C(u),C(2),C(2),C(2),c(0)])},xt=()=>{let s=(1<<7)+1;return g("av1C",[s,0,0,0])},Wt=(e,t)=>g(e,[Array(6).fill(0),c(1),c(0),c(0),n(0),c(t.info.numberOfChannels),c(16),c(0),c(0),A(t.info.sampleRate)],[ri[t.info.codec](t)]),Nt=e=>{let t=new Uint8Array(e.info.decoderConfig.description);return w("esds",0,0,[n(58753152),C(32+t.byteLength),c(1),C(0),n(75530368),C(18+t.byteLength),C(64),C(21),Pe(0),n(130071),n(130071),n(92307584),C(t.byteLength),...t,n(109084800),C(1),C(2)])},Ft=e=>{let t=3840,s=0;const r=e.info.decoderConfig?.description;if(r){if(r.byteLength<18)throw new TypeError("Invalid decoder description provided for Opus; must be at least 18 bytes long.");const a=ArrayBuffer.isView(r)?new DataView(r.buffer,r.byteOffset,r.byteLength):new DataView(r);t=a.getUint16(10,!0),s=a.getInt16(14,!0)}return g("dOps",[C(0),C(e.info.numberOfChannels),c(t),n(e.info.sampleRate),ge(s),C(0)])},Rt=e=>w("stts",0,0,[n(e.timeToSampleTable.length),e.timeToSampleTable.map(t=>[n(t.sampleCount),n(t.sampleDelta)])]),Pt=e=>{if(e.samples.every(s=>s.type==="key"))return null;let t=[...e.samples.entries()].filter(([,s])=>s.type==="key");return w("stss",0,0,[n(t.length),t.map(([s])=>n(s+1))])},Lt=e=>w("stsc",0,0,[n(e.compactlyCodedChunkTable.length),e.compactlyCodedChunkTable.map(t=>[n(t.firstChunk),n(t.samplesPerChunk),n(1)])]),Vt=e=>w("stsz",0,0,[n(0),n(e.samples.length),e.samples.map(t=>n(t.size))]),jt=e=>e.finalizedChunks.length>0&&te(e.finalizedChunks).offset>=2**32?w("co64",0,0,[n(e.finalizedChunks.length),e.finalizedChunks.map(t=>x(t.offset))]):w("stco",0,0,[n(e.finalizedChunks.length),e.finalizedChunks.map(t=>n(t.offset))]),$t=e=>w("ctts",0,0,[n(e.compositionTimeOffsetTable.length),e.compositionTimeOffsetTable.map(t=>[n(t.sampleCount),n(t.sampleCompositionTimeOffset)])]),Ht=e=>g("mvex",null,e.map(qt)),qt=e=>w("trex",0,0,[n(e.id),n(1),n(0),n(0),n(0)]),$e=(e,t)=>g("moof",null,[Xt(e),...t.map(Gt)]),Xt=e=>w("mfhd",0,0,[n(e)]),He=e=>{let t=0,s=0,r=0,a=0,o=e.type==="delta";return s|=+o,o?t|=1:t|=2,t<<24|s<<16|r<<8|a},Gt=e=>g("traf",null,[Zt(e),Kt(e),Qt(e)]),Zt=e=>{let t=0;t|=8,t|=16,t|=32,t|=131072;let s=e.currentChunk.samples[1]??e.currentChunk.samples[0],r={duration:s.timescaleUnitsToNextSample,size:s.size,flags:He(s)};return w("tfhd",0,t,[n(e.id),n(r.duration),n(r.size),n(r.flags)])},Kt=e=>w("tfdt",1,0,[x(B(e.currentChunk.startTimestamp,e.timescale))]),Qt=e=>{let t=e.currentChunk.samples.map(D=>D.timescaleUnitsToNextSample),s=e.currentChunk.samples.map(D=>D.size),r=e.currentChunk.samples.map(He),a=e.currentChunk.samples.map(D=>B(D.presentationTimestamp-D.decodeTimestamp,e.timescale)),o=new Set(t),l=new Set(s),u=new Set(r),v=new Set(a),b=u.size===2&&r[0]!==r[1],U=o.size>1,ee=l.size>1,rt=!b&&u.size>1,at=v.size>1||[...v].some(D=>D!==0),L=0;return L|=1,L|=4*+b,L|=256*+U,L|=512*+ee,L|=1024*+rt,L|=2048*+at,w("trun",1,L,[n(e.currentChunk.samples.length),n(e.currentChunk.offset-e.currentChunk.moofOffset||0),b?n(r[0]):[],e.currentChunk.samples.map((D,ce)=>[U?n(t[ce]):[],ee?n(s[ce]):[],rt?n(r[ce]):[],at?pt(a[ce]):[]])])},Jt=e=>g("mfra",null,[...e.map(Yt),ei()]),Yt=(e,t)=>w("tfra",1,0,[n(e.id),n(63),n(e.finalizedChunks.length),e.finalizedChunks.map(r=>[x(B(r.startTimestamp,e.timescale)),x(r.moofOffset),n(t+1),n(1),n(1)])]),ei=()=>w("mfro",0,0,[n(0)]),ti={avc:"avc1",hevc:"hvc1",vp9:"vp09",av1:"av01"},ii={avc:It,hevc:Dt,vp9:Ut,av1:xt},si={aac:"mp4a",opus:"Opus"},ri={aac:Nt,opus:Ft},ai=Symbol("isTarget"),se=class{},qe=class extends se{constructor(){super(...arguments),this.buffer=null}},Se=class extends se{constructor(e){if(super(),this.options=e,typeof e!="object")throw new TypeError("StreamTarget requires an options object to be passed to its constructor.");if(e.onData){if(typeof e.onData!="function")throw new TypeError("options.onData, when provided, must be a function.");if(e.onData.length<2)throw new TypeError("options.onData, when provided, must be a function that takes in at least two arguments (data and position). Ignoring the position argument, which specifies the byte offset at which the data is to be written, can lead to broken outputs.")}if(e.chunked!==void 0&&typeof e.chunked!="boolean")throw new TypeError("options.chunked, when provided, must be a boolean.");if(e.chunkSize!==void 0&&(!Number.isInteger(e.chunkSize)||e.chunkSize<=0))throw new TypeError("options.chunkSize, when provided, must be a positive integer.")}},Xe=class extends se{constructor(e,t){if(super(),this.stream=e,this.options=t,!(e instanceof FileSystemWritableFileStream))throw new TypeError("FileSystemWritableFileStreamTarget requires a FileSystemWritableFileStream instance.");if(t!==void 0&&typeof t!="object")throw new TypeError("FileSystemWritableFileStreamTarget's options, when provided, must be an object.");if(t&&t.chunkSize!==void 0&&(!Number.isInteger(t.chunkSize)||t.chunkSize<=0))throw new TypeError("options.chunkSize, when provided, must be a positive integer")}},W,j,be=class{constructor(){this.pos=0,d(this,W,new Uint8Array(8)),d(this,j,new DataView(i(this,W).buffer)),this.offsets=new WeakMap}seek(e){this.pos=e}writeU32(e){i(this,j).setUint32(0,e,!1),this.write(i(this,W).subarray(0,4))}writeU64(e){i(this,j).setUint32(0,Math.floor(e/2**32),!1),i(this,j).setUint32(4,e,!1),this.write(i(this,W).subarray(0,8))}writeAscii(e){for(let t=0;t<e.length;t++)i(this,j).setUint8(t%8,e.charCodeAt(t)),t%8===7&&this.write(i(this,W));e.length%8!==0&&this.write(i(this,W).subarray(0,e.length%8))}writeBox(e){if(this.offsets.set(e,this.pos),e.contents&&!e.children)this.writeBoxHeader(e,e.size??e.contents.byteLength+8),this.write(e.contents);else{let t=this.pos;if(this.writeBoxHeader(e,0),e.contents&&this.write(e.contents),e.children)for(let a of e.children)a&&this.writeBox(a);let s=this.pos,r=e.size??s-t;this.seek(t),this.writeBoxHeader(e,r),this.seek(s)}}writeBoxHeader(e,t){this.writeU32(e.largeSize?1:t),this.writeAscii(e.type),e.largeSize&&this.writeU64(t)}measureBoxHeader(e){return 8+(e.largeSize?8:0)}patchBox(e){let t=this.pos;this.seek(this.offsets.get(e)),this.writeBox(e),this.seek(t)}measureBox(e){if(e.contents&&!e.children)return this.measureBoxHeader(e)+e.contents.byteLength;{let t=this.measureBoxHeader(e);if(e.contents&&(t+=e.contents.byteLength),e.children)for(let s of e.children)s&&(t+=this.measureBox(s));return t}}};W=new WeakMap,j=new WeakMap;var re,N,G,Z,ae,_e,ni=class extends be{constructor(e){super(),d(this,ae),d(this,re,void 0),d(this,N,new ArrayBuffer(2**16)),d(this,G,new Uint8Array(i(this,N))),d(this,Z,0),y(this,re,e)}write(e){m(this,ae,_e).call(this,this.pos+e.byteLength),i(this,G).set(e,this.pos),this.pos+=e.byteLength,y(this,Z,Math.max(i(this,Z),this.pos))}finalize(){m(this,ae,_e).call(this,this.pos),i(this,re).buffer=i(this,N).slice(0,Math.max(i(this,Z),this.pos))}};re=new WeakMap,N=new WeakMap,G=new WeakMap,Z=new WeakMap,ae=new WeakSet,_e=function(e){let t=i(this,N).byteLength;for(;t<e;)t*=2;if(t===i(this,N).byteLength)return;let s=new ArrayBuffer(t),r=new Uint8Array(s);r.set(i(this,G),0),y(this,N,s),y(this,G,r)};var ne,F,Ge=class extends be{constructor(e){super(),d(this,ne,void 0),d(this,F,[]),y(this,ne,e)}write(e){i(this,F).push({data:e.slice(),start:this.pos}),this.pos+=e.byteLength}flush(){if(i(this,F).length===0)return;let e=[],t=[...i(this,F)].sort((s,r)=>s.start-r.start);e.push({start:t[0].start,size:t[0].data.byteLength});for(let s=1;s<t.length;s++){let r=e[e.length-1],a=t[s];a.start<=r.start+r.size?r.size=Math.max(r.size,a.start+a.data.byteLength-r.start):e.push({start:a.start,size:a.data.byteLength})}for(let s of e){s.data=new Uint8Array(s.size);for(let r of i(this,F))s.start<=r.start&&r.start<s.start+s.size&&s.data.set(r.data,r.start-s.start);i(this,ne).options.onData?.(s.data,s.start)}i(this,F).length=0}finalize(){}};ne=new WeakMap,F=new WeakMap;var oi=2**24,hi=2,oe,E,_,he,ke,ze,Ze,Ee,Ke,K,le,Qe=class extends be{constructor(e){if(super(),d(this,he),d(this,ze),d(this,Ee),d(this,K),d(this,oe,void 0),d(this,E,void 0),d(this,_,[]),y(this,oe,e),y(this,E,e.options?.chunkSize??oi),!Number.isInteger(i(this,E))||i(this,E)<2**10)throw new Error("Invalid StreamTarget options: chunkSize must be an integer not smaller than 1024.")}write(e){m(this,he,ke).call(this,e,this.pos),m(this,K,le).call(this),this.pos+=e.byteLength}finalize(){m(this,K,le).call(this,!0)}};oe=new WeakMap,E=new WeakMap,_=new WeakMap,he=new WeakSet,ke=function(e,t){let s=i(this,_).findIndex(u=>u.start<=t&&t<u.start+i(this,E));s===-1&&(s=m(this,Ee,Ke).call(this,t));let r=i(this,_)[s],a=t-r.start,o=e.subarray(0,Math.min(i(this,E)-a,e.byteLength));r.data.set(o,a);let l={start:a,end:a+o.byteLength};if(m(this,ze,Ze).call(this,r,l),r.written[0].start===0&&r.written[0].end===i(this,E)&&(r.shouldFlush=!0),i(this,_).length>hi){for(let u=0;u<i(this,_).length-1;u++)i(this,_)[u].shouldFlush=!0;m(this,K,le).call(this)}o.byteLength<e.byteLength&&m(this,he,ke).call(this,e.subarray(o.byteLength),t+o.byteLength)},ze=new WeakSet,Ze=function(e,t){let s=0,r=e.written.length-1,a=-1;for(;s<=r;){let o=Math.floor(s+(r-s+1)/2);e.written[o].start<=t.start?(s=o+1,a=o):r=o-1}for(e.written.splice(a+1,0,t),(a===-1||e.written[a].end<t.start)&&a++;a<e.written.length-1&&e.written[a].end>=e.written[a+1].start;)e.written[a].end=Math.max(e.written[a].end,e.written[a+1].end),e.written.splice(a+1,1)},Ee=new WeakSet,Ke=function(e){let s={start:Math.floor(e/i(this,E))*i(this,E),data:new Uint8Array(i(this,E)),written:[],shouldFlush:!1};return i(this,_).push(s),i(this,_).sort((r,a)=>r.start-a.start),i(this,_).indexOf(s)},K=new WeakSet,le=function(e=!1){for(let t=0;t<i(this,_).length;t++){let s=i(this,_)[t];if(!(!s.shouldFlush&&!e)){for(let r of s.written)i(this,oe).options.onData?.(s.data.subarray(r.start,r.end),s.start+r.start);i(this,_).splice(t--,1)}}};var li=class extends Qe{constructor(e){super(new Se({onData:(t,s)=>e.stream.write({type:"write",data:t,position:s}),chunkSize:e.options?.chunkSize}))}},Oe=1e3,fi=["avc","hevc","vp9","av1"],ui=["aac","opus"],di=2082844800,mi=["strict","offset","cross-track-offset"],h,f,fe,k,S,T,$,H,Ae,R,P,Q,Be,Je,Me,Ye,Ie,et,De,tt,Ue,it,ue,xe,M,I,We,st,J,de,me,Ne,q,Y,pe,Fe,pi=class{constructor(e){if(d(this,Be),d(this,Me),d(this,Ie),d(this,De),d(this,Ue),d(this,ue),d(this,M),d(this,We),d(this,J),d(this,me),d(this,q),d(this,pe),d(this,h,void 0),d(this,f,void 0),d(this,fe,void 0),d(this,k,void 0),d(this,S,null),d(this,T,null),d(this,$,Math.floor(Date.now()/1e3)+di),d(this,H,[]),d(this,Ae,1),d(this,R,[]),d(this,P,[]),d(this,Q,!1),m(this,Be,Je).call(this,e),e.video=X(e.video),e.audio=X(e.audio),e.fastStart=X(e.fastStart),this.target=e.target,y(this,h,{firstTimestampBehavior:"strict",...e}),e.target instanceof qe)y(this,f,new ni(e.target));else if(e.target instanceof Se)y(this,f,e.target.options?.chunked?new Qe(e.target):new Ge(e.target));else if(e.target instanceof Xe)y(this,f,new li(e.target));else throw new Error(`Invalid target: ${e.target}`);m(this,De,tt).call(this),m(this,Me,Ye).call(this)}addVideoChunk(e,t,s,r){if(!(e instanceof EncodedVideoChunk))throw new TypeError("addVideoChunk's first argument (sample) must be of type EncodedVideoChunk.");if(t&&typeof t!="object")throw new TypeError("addVideoChunk's second argument (meta), when provided, must be an object.");if(s!==void 0&&(!Number.isFinite(s)||s<0))throw new TypeError("addVideoChunk's third argument (timestamp), when provided, must be a non-negative real number.");if(r!==void 0&&!Number.isFinite(r))throw new TypeError("addVideoChunk's fourth argument (compositionTimeOffset), when provided, must be a real number.");let a=new Uint8Array(e.byteLength);e.copyTo(a),this.addVideoChunkRaw(a,e.type,s??e.timestamp,e.duration,t,r)}addVideoChunkRaw(e,t,s,r,a,o){if(!(e instanceof Uint8Array))throw new TypeError("addVideoChunkRaw's first argument (data) must be an instance of Uint8Array.");if(t!=="key"&&t!=="delta")throw new TypeError("addVideoChunkRaw's second argument (type) must be either 'key' or 'delta'.");if(!Number.isFinite(s)||s<0)throw new TypeError("addVideoChunkRaw's third argument (timestamp) must be a non-negative real number.");if(!Number.isFinite(r)||r<0)throw new TypeError("addVideoChunkRaw's fourth argument (duration) must be a non-negative real number.");if(a&&typeof a!="object")throw new TypeError("addVideoChunkRaw's fifth argument (meta), when provided, must be an object.");if(o!==void 0&&!Number.isFinite(o))throw new TypeError("addVideoChunkRaw's sixth argument (compositionTimeOffset), when provided, must be a real number.");if(m(this,pe,Fe).call(this),!i(this,h).video)throw new Error("No video track declared.");if(typeof i(this,h).fastStart=="object"&&i(this,S).samples.length===i(this,h).fastStart.expectedVideoChunks)throw new Error(`Cannot add more video chunks than specified in 'fastStart' (${i(this,h).fastStart.expectedVideoChunks}).`);let l=m(this,ue,xe).call(this,i(this,S),e,t,s,r,a,o);if(i(this,h).fastStart==="fragmented"&&i(this,T)){for(;i(this,P).length>0&&i(this,P)[0].decodeTimestamp<=l.decodeTimestamp;){let u=i(this,P).shift();m(this,M,I).call(this,i(this,T),u)}l.decodeTimestamp<=i(this,T).lastDecodeTimestamp?m(this,M,I).call(this,i(this,S),l):i(this,R).push(l)}else m(this,M,I).call(this,i(this,S),l)}addAudioChunk(e,t,s){if(!(e instanceof EncodedAudioChunk))throw new TypeError("addAudioChunk's first argument (sample) must be of type EncodedAudioChunk.");if(t&&typeof t!="object")throw new TypeError("addAudioChunk's second argument (meta), when provided, must be an object.");if(s!==void 0&&(!Number.isFinite(s)||s<0))throw new TypeError("addAudioChunk's third argument (timestamp), when provided, must be a non-negative real number.");let r=new Uint8Array(e.byteLength);e.copyTo(r),this.addAudioChunkRaw(r,e.type,s??e.timestamp,e.duration,t)}addAudioChunkRaw(e,t,s,r,a){if(!(e instanceof Uint8Array))throw new TypeError("addAudioChunkRaw's first argument (data) must be an instance of Uint8Array.");if(t!=="key"&&t!=="delta")throw new TypeError("addAudioChunkRaw's second argument (type) must be either 'key' or 'delta'.");if(!Number.isFinite(s)||s<0)throw new TypeError("addAudioChunkRaw's third argument (timestamp) must be a non-negative real number.");if(!Number.isFinite(r)||r<0)throw new TypeError("addAudioChunkRaw's fourth argument (duration) must be a non-negative real number.");if(a&&typeof a!="object")throw new TypeError("addAudioChunkRaw's fifth argument (meta), when provided, must be an object.");if(m(this,pe,Fe).call(this),!i(this,h).audio)throw new Error("No audio track declared.");if(typeof i(this,h).fastStart=="object"&&i(this,T).samples.length===i(this,h).fastStart.expectedAudioChunks)throw new Error(`Cannot add more audio chunks than specified in 'fastStart' (${i(this,h).fastStart.expectedAudioChunks}).`);let o=m(this,ue,xe).call(this,i(this,T),e,t,s,r,a);if(i(this,h).fastStart==="fragmented"&&i(this,S)){for(;i(this,R).length>0&&i(this,R)[0].decodeTimestamp<=o.decodeTimestamp;){let l=i(this,R).shift();m(this,M,I).call(this,i(this,S),l)}o.decodeTimestamp<=i(this,S).lastDecodeTimestamp?m(this,M,I).call(this,i(this,T),o):i(this,P).push(o)}else m(this,M,I).call(this,i(this,T),o)}finalize(){if(i(this,Q))throw new Error("Cannot finalize a muxer more than once.");if(i(this,h).fastStart==="fragmented"){for(let t of i(this,R))m(this,M,I).call(this,i(this,S),t);for(let t of i(this,P))m(this,M,I).call(this,i(this,T),t);m(this,me,Ne).call(this,!1)}else i(this,S)&&m(this,J,de).call(this,i(this,S)),i(this,T)&&m(this,J,de).call(this,i(this,T));let e=[i(this,S),i(this,T)].filter(Boolean);if(i(this,h).fastStart==="in-memory"){let t;for(let r=0;r<2;r++){let a=ie(e,i(this,$)),o=i(this,f).measureBox(a);t=i(this,f).measureBox(i(this,k));let l=i(this,f).pos+o+t;for(let u of i(this,H)){u.offset=l;for(let{data:v}of u.samples)l+=v.byteLength,t+=v.byteLength}if(l<2**32)break;t>=2**32&&(i(this,k).largeSize=!0)}let s=ie(e,i(this,$));i(this,f).writeBox(s),i(this,k).size=t,i(this,f).writeBox(i(this,k));for(let r of i(this,H))for(let a of r.samples)i(this,f).write(a.data),a.data=null}else if(i(this,h).fastStart==="fragmented"){let t=i(this,f).pos,s=Jt(e);i(this,f).writeBox(s);let r=i(this,f).pos-t;i(this,f).seek(i(this,f).pos-4),i(this,f).writeU32(r)}else{let t=i(this,f).offsets.get(i(this,k)),s=i(this,f).pos-t;i(this,k).size=s,i(this,k).largeSize=s>=2**32,i(this,f).patchBox(i(this,k));let r=ie(e,i(this,$));if(typeof i(this,h).fastStart=="object"){i(this,f).seek(i(this,fe)),i(this,f).writeBox(r);let a=t-i(this,f).pos;i(this,f).writeBox(wt(a))}else i(this,f).writeBox(r)}m(this,q,Y).call(this),i(this,f).finalize(),y(this,Q,!0)}};return h=new WeakMap,f=new WeakMap,fe=new WeakMap,k=new WeakMap,S=new WeakMap,T=new WeakMap,$=new WeakMap,H=new WeakMap,Ae=new WeakMap,R=new WeakMap,P=new WeakMap,Q=new WeakMap,Be=new WeakSet,Je=function(e){if(typeof e!="object")throw new TypeError("The muxer requires an options object to be passed to its constructor.");if(!(e.target instanceof se))throw new TypeError("The target must be provided and an instance of Target.");if(e.video){if(!fi.includes(e.video.codec))throw new TypeError(`Unsupported video codec: ${e.video.codec}`);if(!Number.isInteger(e.video.width)||e.video.width<=0)throw new TypeError(`Invalid video width: ${e.video.width}. Must be a positive integer.`);if(!Number.isInteger(e.video.height)||e.video.height<=0)throw new TypeError(`Invalid video height: ${e.video.height}. Must be a positive integer.`);const t=e.video.rotation;if(typeof t=="number"&&![0,90,180,270].includes(t))throw new TypeError(`Invalid video rotation: ${t}. Has to be 0, 90, 180 or 270.`);if(Array.isArray(t)&&(t.length!==9||t.some(s=>typeof s!="number")))throw new TypeError(`Invalid video transformation matrix: ${t.join()}`);if(e.video.frameRate!==void 0&&(!Number.isInteger(e.video.frameRate)||e.video.frameRate<=0))throw new TypeError(`Invalid video frame rate: ${e.video.frameRate}. Must be a positive integer.`)}if(e.audio){if(!ui.includes(e.audio.codec))throw new TypeError(`Unsupported audio codec: ${e.audio.codec}`);if(!Number.isInteger(e.audio.numberOfChannels)||e.audio.numberOfChannels<=0)throw new TypeError(`Invalid number of audio channels: ${e.audio.numberOfChannels}. Must be a positive integer.`);if(!Number.isInteger(e.audio.sampleRate)||e.audio.sampleRate<=0)throw new TypeError(`Invalid audio sample rate: ${e.audio.sampleRate}. Must be a positive integer.`)}if(e.firstTimestampBehavior&&!mi.includes(e.firstTimestampBehavior))throw new TypeError(`Invalid first timestamp behavior: ${e.firstTimestampBehavior}`);if(typeof e.fastStart=="object"){if(e.video){if(e.fastStart.expectedVideoChunks===void 0)throw new TypeError("'fastStart' is an object but is missing property 'expectedVideoChunks'.");if(!Number.isInteger(e.fastStart.expectedVideoChunks)||e.fastStart.expectedVideoChunks<0)throw new TypeError("'expectedVideoChunks' must be a non-negative integer.")}if(e.audio){if(e.fastStart.expectedAudioChunks===void 0)throw new TypeError("'fastStart' is an object but is missing property 'expectedAudioChunks'.");if(!Number.isInteger(e.fastStart.expectedAudioChunks)||e.fastStart.expectedAudioChunks<0)throw new TypeError("'expectedAudioChunks' must be a non-negative integer.")}}else if(![!1,"in-memory","fragmented"].includes(e.fastStart))throw new TypeError("'fastStart' option must be false, 'in-memory', 'fragmented' or an object.")},Me=new WeakSet,Ye=function(){if(i(this,f).writeBox(ct({holdsAvc:i(this,h).video?.codec==="avc",fragmented:i(this,h).fastStart==="fragmented"})),y(this,fe,i(this,f).pos),i(this,h).fastStart==="in-memory")y(this,k,Te(!1));else if(i(this,h).fastStart!=="fragmented"){if(typeof i(this,h).fastStart=="object"){let e=m(this,Ie,et).call(this);i(this,f).seek(i(this,f).pos+e)}y(this,k,Te(!0)),i(this,f).writeBox(i(this,k))}m(this,q,Y).call(this)},Ie=new WeakSet,et=function(){if(typeof i(this,h).fastStart!="object")return;let e=0,t=[i(this,h).fastStart.expectedVideoChunks,i(this,h).fastStart.expectedAudioChunks];for(let s of t)s&&(e+=8*Math.ceil(.6666666666666666*s),e+=4*s,e+=12*Math.ceil(.6666666666666666*s),e+=4*s,e+=8*s);return e+=4096,e},De=new WeakSet,tt=function(){if(i(this,h).video&&y(this,S,{id:1,info:{type:"video",codec:i(this,h).video.codec,width:i(this,h).video.width,height:i(this,h).video.height,rotation:i(this,h).video.rotation??0,decoderConfig:null},timescale:i(this,h).video.frameRate??57600,samples:[],finalizedChunks:[],currentChunk:null,firstDecodeTimestamp:void 0,lastDecodeTimestamp:-1,timeToSampleTable:[],compositionTimeOffsetTable:[],lastTimescaleUnits:null,lastSample:null,compactlyCodedChunkTable:[]}),i(this,h).audio&&(y(this,T,{id:i(this,h).video?2:1,info:{type:"audio",codec:i(this,h).audio.codec,numberOfChannels:i(this,h).audio.numberOfChannels,sampleRate:i(this,h).audio.sampleRate,decoderConfig:null},timescale:i(this,h).audio.sampleRate,samples:[],finalizedChunks:[],currentChunk:null,firstDecodeTimestamp:void 0,lastDecodeTimestamp:-1,timeToSampleTable:[],compositionTimeOffsetTable:[],lastTimescaleUnits:null,lastSample:null,compactlyCodedChunkTable:[]}),i(this,h).audio.codec==="aac")){let e=m(this,Ue,it).call(this,2,i(this,h).audio.sampleRate,i(this,h).audio.numberOfChannels);i(this,T).info.decoderConfig={codec:i(this,h).audio.codec,description:e,numberOfChannels:i(this,h).audio.numberOfChannels,sampleRate:i(this,h).audio.sampleRate}}},Ue=new WeakSet,it=function(e,t,s){let a=[96e3,88200,64e3,48e3,44100,32e3,24e3,22050,16e3,12e3,11025,8e3,7350].indexOf(t),o=s,l="";l+=e.toString(2).padStart(5,"0"),l+=a.toString(2).padStart(4,"0"),a===15&&(l+=t.toString(2).padStart(24,"0")),l+=o.toString(2).padStart(4,"0");let u=Math.ceil(l.length/8)*8;l=l.padEnd(u,"0");let v=new Uint8Array(l.length/8);for(let b=0;b<l.length;b+=8)v[b/8]=parseInt(l.slice(b,b+8),2);return v},ue=new WeakSet,xe=function(e,t,s,r,a,o,l){let u=r/1e6,v=(r-(l??0))/1e6,b=a/1e6,U=m(this,We,st).call(this,u,v,e);return u=U.presentationTimestamp,v=U.decodeTimestamp,o?.decoderConfig&&(e.info.decoderConfig===null?e.info.decoderConfig=o.decoderConfig:Object.assign(e.info.decoderConfig,o.decoderConfig)),{presentationTimestamp:u,decodeTimestamp:v,duration:b,data:t,size:t.byteLength,type:s,timescaleUnitsToNextSample:B(b,e.timescale)}},M=new WeakSet,I=function(e,t){i(this,h).fastStart!=="fragmented"&&e.samples.push(t);const s=B(t.presentationTimestamp-t.decodeTimestamp,e.timescale);if(e.lastTimescaleUnits!==null){let a=B(t.decodeTimestamp,e.timescale,!1),o=Math.round(a-e.lastTimescaleUnits);if(e.lastTimescaleUnits+=o,e.lastSample.timescaleUnitsToNextSample=o,i(this,h).fastStart!=="fragmented"){let l=te(e.timeToSampleTable);l.sampleCount===1?(l.sampleDelta=o,l.sampleCount++):l.sampleDelta===o?l.sampleCount++:(l.sampleCount--,e.timeToSampleTable.push({sampleCount:2,sampleDelta:o}));const u=te(e.compositionTimeOffsetTable);u.sampleCompositionTimeOffset===s?u.sampleCount++:e.compositionTimeOffsetTable.push({sampleCount:1,sampleCompositionTimeOffset:s})}}else e.lastTimescaleUnits=0,i(this,h).fastStart!=="fragmented"&&(e.timeToSampleTable.push({sampleCount:1,sampleDelta:B(t.duration,e.timescale)}),e.compositionTimeOffsetTable.push({sampleCount:1,sampleCompositionTimeOffset:s}));e.lastSample=t;let r=!1;if(!e.currentChunk)r=!0;else{let a=t.presentationTimestamp-e.currentChunk.startTimestamp;if(i(this,h).fastStart==="fragmented"){let o=i(this,S)??i(this,T);e===o&&t.type==="key"&&a>=1&&(r=!0,m(this,me,Ne).call(this))}else r=a>=.5}r&&(e.currentChunk&&m(this,J,de).call(this,e),e.currentChunk={startTimestamp:t.presentationTimestamp,samples:[]}),e.currentChunk.samples.push(t)},We=new WeakSet,st=function(e,t,s){const r=i(this,h).firstTimestampBehavior==="strict",a=s.lastDecodeTimestamp===-1;if(r&&a&&t!==0)throw new Error(`The first chunk for your media track must have a timestamp of 0 (received DTS=${t}).Non-zero first timestamps are often caused by directly piping frames or audio data from a MediaStreamTrack into the encoder. Their timestamps are typically relative to the age of thedocument, which is probably what you want.
+
+If you want to offset all timestamps of a track such that the first one is zero, set firstTimestampBehavior: 'offset' in the options.
+`);if(i(this,h).firstTimestampBehavior==="offset"||i(this,h).firstTimestampBehavior==="cross-track-offset"){s.firstDecodeTimestamp===void 0&&(s.firstDecodeTimestamp=t);let l;i(this,h).firstTimestampBehavior==="offset"?l=s.firstDecodeTimestamp:l=Math.min(i(this,S)?.firstDecodeTimestamp??1/0,i(this,T)?.firstDecodeTimestamp??1/0),t-=l,e-=l}if(t<s.lastDecodeTimestamp)throw new Error(`Timestamps must be monotonically increasing (DTS went from ${s.lastDecodeTimestamp*1e6} to ${t*1e6}).`);return s.lastDecodeTimestamp=t,{presentationTimestamp:e,decodeTimestamp:t}},J=new WeakSet,de=function(e){if(i(this,h).fastStart==="fragmented")throw new Error("Can't finalize individual chunks if 'fastStart' is set to 'fragmented'.");if(e.currentChunk){if(e.finalizedChunks.push(e.currentChunk),i(this,H).push(e.currentChunk),(e.compactlyCodedChunkTable.length===0||te(e.compactlyCodedChunkTable).samplesPerChunk!==e.currentChunk.samples.length)&&e.compactlyCodedChunkTable.push({firstChunk:e.finalizedChunks.length,samplesPerChunk:e.currentChunk.samples.length}),i(this,h).fastStart==="in-memory"){e.currentChunk.offset=0;return}e.currentChunk.offset=i(this,f).pos;for(let t of e.currentChunk.samples)i(this,f).write(t.data),t.data=null;m(this,q,Y).call(this)}},me=new WeakSet,Ne=function(e=!0){if(i(this,h).fastStart!=="fragmented")throw new Error("Can't finalize a fragment unless 'fastStart' is set to 'fragmented'.");let t=[i(this,S),i(this,T)].filter(u=>u&&u.currentChunk);if(t.length===0)return;let s=dt(this,Ae)._++;if(s===1){let u=ie(t,i(this,$),!0);i(this,f).writeBox(u)}let r=i(this,f).pos,a=$e(s,t);i(this,f).writeBox(a);{let u=Te(!1),v=0;for(let U of t)for(let ee of U.currentChunk.samples)v+=ee.size;let b=i(this,f).measureBox(u)+v;b>=4294967296&&(u.largeSize=!0,b=i(this,f).measureBox(u)+v),u.size=b,i(this,f).writeBox(u)}for(let u of t){u.currentChunk.offset=i(this,f).pos,u.currentChunk.moofOffset=r;for(let v of u.currentChunk.samples)i(this,f).write(v.data),v.data=null}let o=i(this,f).pos;i(this,f).seek(i(this,f).offsets.get(a));let l=$e(s,t);i(this,f).writeBox(l),i(this,f).seek(o);for(let u of t)u.finalizedChunks.push(u.currentChunk),i(this,H).push(u.currentChunk),u.currentChunk=null;e&&m(this,q,Y).call(this)},q=new WeakSet,Y=function(){i(this,f)instanceof Ge&&i(this,f).flush()},pe=new WeakSet,Fe=function(){if(i(this,Q))throw new Error("Cannot add new video or audio chunks after the file has been finalized.")},ut(Re)})();typeof module=="object"&&typeof module.exports=="object"&&Object.assign(module.exports,Mp4Muxer);
+
+</script>
 <script>
 (()=>{
 'use strict';
@@ -698,6 +705,7 @@ function diagTick(now){
 function startDiag(){
   if(P.clips.length<2){ toast('Add at least two clips to check the cuts between them'); return; }
   closeSheets(); layout(); diag.on=true; diag.cuts=[]; diag.errs=[]; diag.lastI=-1; diag.endAt=Math.min(total(),videoEnd(),45);
+  bridgeUses=0; P.clips.forEach(c=>{ c._bridged=false; });
   T=0; ensureAudio(); unlockVideos(); setPlaying(true); toast('Checking playback… let it play');
 }
 function finishDiag(){
@@ -706,7 +714,7 @@ function finishDiag(){
   const ua=navigator.userAgent.replace(/^Mozilla\/5\.0 /,'').slice(0,120);
   const lines=[`Splice playback check · ${new Date().toLocaleString()}`,`Device: ${ua}`,`Standalone app: ${!!(navigator.standalone||matchMedia('(display-mode: standalone)').matches)} · players: ${vpool.length} · simplified preview: ${lowFx}`,
     `Cuts: ${cs.length} · moving at the cut: ${cs.filter(c=>c.moving).length} · first new frame avg ${avg??'?'} ms, worst ${firsts.length?Math.max(...firsts):'?'} ms`,
-    `Refused plays: ${diag.errs.length?diag.errs.join(', '):'none'}`,
+    `Refused plays: ${diag.errs.length?diag.errs.join(', '):'none'} · cut bridge stepped in: ${bridgeUses}× · decoder: ${window.VideoDecoder?'yes':'no'} · exact export: ${window.VideoEncoder?'yes':'no'}`,
     `Rotation tags: browser ${rotMode||'?'} · ${Object.values(media).filter(m=>m.kind==='video'&&!m.sample).map(m=>`${m.name.slice(0,18)} tag ${m.metaRot||0}° turn ${m.rot||0}°${m.rotUser?' (you)':m.orient?' (auto)':''}`).join('; ')||'no videos'}`,
     ...cs.map(c=>`#${c.n} ${c.file} [${c.type} ${c.res}]${c.sameFile?' same-file':''}${c.trans?' transition':''}: ${c.moving?'moving':'STILL'}, ready ${c.ready}, off ${c.off}ms, rate ${c.rate}, first frame ${c.first??'?'}ms`)];
   const txt=lines.join('\n');
@@ -887,7 +895,13 @@ function drawClip(c,local,o={}){
   let src,sw,sh;
   if(m.kind==='image'){ src=m.img; sw=m.w; sh=m.h; }
   let sub=null, metaTurn=0;
-  if(m.kind!=='image'){ const r=getEl(c);
+  const ov=m.kind==='video'&&frameOv.size?frameOv.get(c.id):null;
+  if(ov){ src=ov.src; sw=ov.sw; sh=ov.sh;
+    if(ov.raw) metaTurn=m.metaRot||0;   // decoded frames come straight from the file, before its rotation tag
+    else if(needTurn(m)){ metaTurn=m.metaRot; if(rotMode==='stretched'&&m.metaRot%180){ const t=sw; sw=sh; sh=t; } } }
+  else if(m.kind==='video' && playing && !exporting && bridges.size && !playerOnTime(slotOf(c.id),c,local) && bridgeFrame(c,local)){
+    const f=bridgeFrame(c,local); src=f.img; sw=f.img.width; sh=f.img.height; metaTurn=m.metaRot||0; if(!c._bridged){ c._bridged=true; bridgeUses++; } }
+  else if(m.kind!=='image'){ const r=getEl(c);
     if(r && r.el.readyState>=2 && r.el.videoWidth){ src=r.el; sw=src.videoWidth; sh=src.videoHeight; if(needTurn(m)){ metaTurn=m.metaRot; if(rotMode==='stretched'&&m.metaRot%180){ const t=sw; sw=sh; sh=t; } } }
     else { const f=stillFor(m,c.in+clamp(local,0,c._d)*c.speed); if(!f) return; src=f.img; sub=f.sub; sw=m.w||f.sub[2]; sh=m.h||f.sub[3]; } }
   if(!sw||!sh) return;
@@ -1117,6 +1131,7 @@ function pickMaster(){
   return m&&m.kind==='video'?c:null;
 }
 function loop(now){
+  if(exporting&&exporting.offline){ requestAnimationFrame(loop); return; }
   const dt=lastNow?now-lastNow:16; lastNow=now;
   if(playing){
     let t=playT0+(now-playW0)/1000;
@@ -1126,7 +1141,7 @@ function loop(now){
     const mc=am?null:pickMaster(), r=mc&&slotOf(mc.id);
     if(am){ const lt=am.a.start+(am.r.el.currentTime-am.a.in); if(Math.abs(lt-t)<1.5){ t=Math.max(T,lt); masterAudio=am.a.id; } playT0=t; playW0=now; holdSince=0; }
     else if(r && !r.el.paused){
-      if(r.el.seeking||r.el.readyState<3){ if(!holdSince) holdSince=now; if(now-holdSince<500) t=T; }  // still loading: wait briefly rather than run ahead
+      if(r.el.seeking||r.el.readyState<3){ if(bridgeFrame(mc,t-mc._s)){ holdSince=0; } else { if(!holdSince) holdSince=now; if(now-holdSince<500) t=T; } }  // still loading: wait briefly rather than run ahead (unless the cut bridge has the frames)
       else { holdSince=0; const lt=(r.el.currentTime-mc.in)/mc.speed;
         if(lt>=-.1 && lt<=mc._d+.15){ t=Math.max(T,mc._s+lt); masterId=mc.id; } }   // follow the video; never step backwards
       playT0=t; playW0=now;
@@ -1141,7 +1156,7 @@ function loop(now){
     const tls=$('#tls'), x=headW()+T*pps;
     if(x>tls.scrollLeft+tls.clientWidth-40 || x<tls.scrollLeft+headW()) tls.scrollLeft=x-headW()-40;
   }
-  syncMedia();
+  syncMedia(); tendBridges();
   // video only changes ~30 times a second: on 60/120 Hz screens, skip the in-between redraws while video is driving playback
   diagTick(now);
   const skip=playing && masterId && !exporting && !dirty && now-lastDraw<30;
@@ -1562,6 +1577,7 @@ async function readRotation(blob){
       const ver=u[i+4], o=i+8+(ver===1?32:20)+16; if(o+44>u.length) continue;
       const a=dv.getInt32(o)/65536, b=dv.getInt32(o+4)/65536, w=dv.getUint32(o+36), h=dv.getUint32(o+40);
       if(!w&&!h) continue;                                         // a sound track: no picture
+      readRotation.found=true;
       if(Math.abs(a)<.5 && b>.5) return 90; if(a<-.5) return 180; if(Math.abs(a)<.5 && b<-.5) return 270; return 0; } } }
   return 0;
 }
@@ -1575,8 +1591,10 @@ function drawUpright(g,v,m,x,y,w,h){
   const bw=side?h:w, bh=side?w:h; g.drawImage(v,-bw/2,-bh/2,bw,bh); g.restore();
 }
 async function checkRotation(m){
-  if(m.kind!=='video'||m.metaChecked||!m.blob) return;
+  if(m.kind!=='video'||(m.metaChecked&&m.metaTag!==undefined)||!m.blob) return;
+  readRotation.found=false;
   try{ await getRotMode(); m.metaRot=await readRotation(m.blob); }catch(e){ m.metaRot=0; }
+  m.metaTag=!!readRotation.found;   // the camera wrote down which way it was held (even "normal, 0°")
   m.metaChecked=true;
   if(needTurn(m) && m.metaRot%180 && rotMode==='ignored' && m.w&&m.h&&m.w>m.h){ const t=m.w; m.w=m.h; m.h=t; }   // portrait shown as portrait
   if(needTurn(m)){ m.strip=null; m.thumb=null; await makeStrip(m); }                                               // redraw thumbnails upright
@@ -2159,6 +2177,358 @@ function applyAspect(doCommit){
 }
 
 /* ---------------- export ---------------- */
+
+/* ---- cut bridge (preview) ----
+   Just before each cut, the first moments of the incoming clip are decoded straight from the file by the video hardware.
+   If the phone's player isn't showing the right frame yet when the cut arrives, those frames are shown instead, and the
+   clock keeps running instead of waiting, so the cut is instant. The player takes over the moment it has caught up. */
+const bridges=new Map(); let bridgeUses=0, bridgeBusy=0;
+const BRIDGE_SECS=.6;
+function bridgeKey(c){ return `${c.mediaId}|${c.in.toFixed(3)}|${c.speed}`; }
+function bridgeStart(c){ const i=P.clips.indexOf(c), dIn=i>0?trDur(P.clips[i-1],c):0; return Math.max(0,c.in-(dIn/2)*c.speed); }
+async function buildBridge(c){
+  const m=media[c.mediaId]; if(!m||m.kind!=='video'||!m.blob||!window.VideoDecoder) return;
+  const key=bridgeKey(c), old=bridges.get(c.id); if(old && old.key===key) return;
+  if(old) dropBridge(c.id);
+  if(bridgeBusy>=1) return;            // one at a time, so it never competes with playback
+  const br={key,ready:false,frames:[],src0:bridgeStart(c),src1:0}; br.src1=br.src0+BRIDGE_SECS*c.speed+(c.in-br.src0); bridges.set(c.id,br);
+  bridgeBusy++; let d=null;
+  try{
+    d=await FrameDecoder.open(m); if(!d){ br.failed=true; return; }
+    const lim=640; let last=-1;
+    for(let t=br.src0;t<=br.src1+1e-3;t+=1/60){
+      if(bridges.get(c.id)!==br) return;   // the edit changed while decoding
+      const f=await d.frameAt(t); if(!f || f.timestamp===last) continue; last=f.timestamp;
+      const fw=f.displayWidth, fh=f.displayHeight, k=Math.min(1,lim/Math.max(fw,fh)), cc=document.createElement('canvas');
+      cc.width=Math.max(2,Math.round(fw*k)); cc.height=Math.max(2,Math.round(fh*k)); cc.getContext('2d').drawImage(f,0,0,cc.width,cc.height);
+      br.frames.push({t:f.timestamp/1e6,img:cc,fw,fh});
+    }
+    br.ready=br.frames.length>0;
+  }catch(e){ br.failed=true; }
+  finally{ bridgeBusy--; if(d) d.close(); }
+}
+function dropBridge(id){ const br=bridges.get(id); if(!br) return; br.frames.forEach(f=>{ f.img.width=f.img.height=0; }); bridges.delete(id); }
+function bridgeFrame(c,local){
+  const br=bridges.get(c.id); if(!br||!br.ready||br.key!==bridgeKey(c)) return null;
+  const st=c.in+local*c.speed; if(st<br.src0-.02||st>br.frames[br.frames.length-1].t+.05) return null;
+  let f=br.frames[0]; for(const x of br.frames){ if(x.t<=st+.001) f=x; else break; } return f;
+}
+// is the phone's player really showing (about) the right frame right now?
+function playerOnTime(r,c,local){ if(!r) return false; const el=r.el, st=c.in+local*c.speed;
+  return el.readyState>=2 && !el.seeking && el.videoWidth && (!playing || !el.paused) && Math.abs(el.currentTime-st)<.07; }
+function tendBridges(){
+  if(!playing||exporting){ return; }
+  const cs=P.clips; layout();
+  for(const c of cs){ const ahead=c._s-T;
+    if(ahead>-.3 && ahead<3.5){ if(!bridges.has(c.id)||bridges.get(c.id).key!==bridgeKey(c)) buildBridge(c); } }
+  for(const id of [...bridges.keys()]){ const c=cs.find(x=>x.id===id); if(!c || T>c._s+BRIDGE_SECS+1 || c._s-T>6) dropBridge(id); }
+}
+
+/* ---------------- frame-exact export ----------------
+   Export no longer records the preview as it plays (any hiccup on the phone ended up in the file). Instead every frame
+   is built one at a time: each clip's exact frame is decoded by the phone's video hardware, drawn, and handed to the
+   video encoder; sound is mixed separately with sample accuracy. Cuts land on the exact frame, however busy the phone is. */
+const MP4={
+  four:(u,p)=>String.fromCharCode(u[p],u[p+1],u[p+2],u[p+3]),
+  kids(u,dv,start,end){ const out=[]; let p=start;
+    while(p+8<=end){ let size=dv.getUint32(p), hs=8; const type=MP4.four(u,p+4);
+      if(size===1){ size=Number(dv.getBigUint64(p+8)); hs=16; } else if(size===0) size=end-p;
+      if(size<8||p+size>end) break; out.push({type,start:p,body:p+hs,end:p+size}); p+=size; }
+    return out; },
+  find(u,dv,box,path){ let cur=[box]; for(const t of path){ const nx=[]; for(const b of cur) for(const k of MP4.kids(u,dv,b.body,b.end)) if(k.type===t) nx.push(k); cur=nx; if(!cur.length) return null; } return cur[0]; },
+  all(u,dv,box,type){ return MP4.kids(u,dv,box.body,box.end).filter(k=>k.type===type); }
+};
+const mp4Cache=new WeakMap();
+async function parseMp4(blob){
+  if(mp4Cache.has(blob)) return mp4Cache.get(blob);
+  const job=(async()=>{
+    // find the movie header box (moov) among the top-level boxes
+    let p=0, moov=null; const size=blob.size;
+    for(let n=0;n<64 && p+8<=size;n++){ const h=new DataView(await blob.slice(p,Math.min(size,p+16)).arrayBuffer()); if(h.byteLength<8) break;
+      let s=h.getUint32(0), hs=8; const t=String.fromCharCode(h.getUint8(4),h.getUint8(5),h.getUint8(6),h.getUint8(7));
+      if(s===1){ if(h.byteLength<16) break; s=Number(h.getBigUint64(8)); hs=16; } else if(s===0) s=size-p;
+      if(s<8) break; if(t==='moov'){ moov={start:p,size:s,hs}; break; } p+=s; }
+    if(!moov || moov.size>200e6) return null;
+    const u=new Uint8Array(await blob.slice(moov.start,moov.start+moov.size).arrayBuffer()), dv=new DataView(u.buffer);
+    const root={body:moov.hs,end:u.length};
+    const mvhd=MP4.find(u,dv,root,['mvhd']); const mvTs=mvhd? dv.getUint32(mvhd.body+(u[mvhd.body]===1?20:12)) : 1000;
+    const tracks=[];
+    for(const trak of MP4.all(u,dv,root,'trak')){
+      const hdlr=MP4.find(u,dv,trak,['mdia','hdlr']), mdhd=MP4.find(u,dv,trak,['mdia','mdhd']), stbl=MP4.find(u,dv,trak,['mdia','minf','stbl']);
+      if(!hdlr||!mdhd||!stbl) continue;
+      const kind=MP4.four(u,hdlr.body+8); if(kind!=='vide'&&kind!=='soun') continue;
+      const ts=dv.getUint32(mdhd.body+(u[mdhd.body]===1?20:12)); if(!ts) continue;
+      const box=t=>MP4.kids(u,dv,stbl.body,stbl.end).find(k=>k.type===t);
+      const stsd=box('stsd'); if(!stsd) continue;
+      const ent=MP4.kids(u,dv,stsd.body+8,stsd.end)[0]; if(!ent) continue;
+      const tr={kind,ts,fourcc:ent.type};
+      if(kind==='vide'){
+        tr.w=dv.getUint16(ent.body+24); tr.h=dv.getUint16(ent.body+26);
+        const ch=MP4.kids(u,dv,ent.body+78,ent.end), cfg=ch.find(k=>k.type==='avcC'||k.type==='hvcC'||k.type==='vpcC'||k.type==='av1C');
+        if(!cfg) continue; const d=u.slice(cfg.body,cfg.end); tr.desc=d; const p2=x=>String(x).padStart(2,'0');
+        if(cfg.type==='vpcC'){ tr.desc=undefined; tr.codec=`vp09.${p2(d[4])}.${p2(d[5])}.${p2(d[6]>>4)}`; }
+        else if(cfg.type==='av1C'){ const prof=d[1]>>5, lvl=d[1]&31, tier=d[2]>>7, hb=(d[2]>>6)&1, tw=(d[2]>>5)&1; tr.codec=`av01.${prof}.${p2(lvl)}${tier?'H':'M'}.${hb?(tw?'12':'10'):'08'}`; }
+        else if(cfg.type==='avcC'){ const hx=x=>x.toString(16).padStart(2,'0'); tr.codec='avc1.'+hx(d[1])+hx(d[2])+hx(d[3]); }
+        else { const sp=d[1]>>6, tier=(d[1]>>5)&1, pidc=d[1]&31; let cf=((d[2]<<24)|(d[3]<<16)|(d[4]<<8)|d[5])>>>0, rv=0; for(let i=0;i<32;i++){ rv=(rv<<1)|(cf&1); cf>>>=1; } rv>>>=0;
+          const cons=[...d.slice(6,12)]; while(cons.length&&!cons[cons.length-1]) cons.pop();
+          tr.codec=`${ent.type==='hev1'?'hev1':'hvc1'}.${['','A','B','C'][sp]}${pidc}.${rv.toString(16)}.${tier?'H':'L'}${d[12]}${cons.map(x=>'.'+x.toString(16)).join('')}`; }
+      } else {
+        tr.ch=dv.getUint16(ent.body+16); tr.sr=dv.getUint32(ent.body+24)>>>16;
+        // the decoder setup (AudioSpecificConfig) sits in an esds box, sometimes wrapped in a QuickTime 'wave' box: search for it
+        let asc=null; for(let i=ent.body;i<ent.end-8;i++){ if(u[i]===0x65&&u[i+1]===0x73&&u[i+2]===0x64&&u[i+3]===0x73){
+          // walk the descriptors: ES (0x03) → DecoderConfig (0x04) → DecoderSpecificInfo (0x05)
+          let k=i+8; const end=Math.min(ent.end,i-4+dv.getUint32(i-4));
+          const desc=()=>{ const tag=u[k++]; let len=0; for(let q=0;q<4;q++){ const b=u[k++]; len=(len<<7)|(b&127); if(!(b&128)) break; } return {tag,len}; };
+          try{ let d=desc(); if(d.tag===0x03){ k+=2; const fl=u[k++]; if(fl&0x80) k+=2; if(fl&0x40) k+=1+u[k]; if(fl&0x20) k+=2; d=desc(); }
+            if(d.tag===0x04){ k+=13; d=desc(); if(d.tag===0x05 && d.len>=2 && k+d.len<=end) asc=u.slice(k,k+d.len); } }catch(e){}
+          break; } }
+        if(ent.type!=='mp4a'||!asc) continue; tr.asc=asc;
+        const ot=asc[0]>>3, fi=((asc[0]&7)<<1)|(asc[1]>>7), cc=(asc[1]>>3)&15; tr.aot=ot; tr.fi=fi; tr.cc=cc||tr.ch||2;
+        const SR=[96000,88200,64000,48000,44100,32000,24000,22050,16000,12000,11025,8000,7350]; if(SR[fi]) tr.sr=SR[fi];
+      }
+      // sample table
+      const stsz=box('stsz'), stsc=box('stsc'), stco=box('stco')||box('co64'), stts=box('stts'); if(!stsz||!stsc||!stco||!stts) continue;
+      const n=dv.getUint32(stsz.body+8), fixed=dv.getUint32(stsz.body+4); if(!n) continue;
+      const sizes=new Uint32Array(n); for(let i=0;i<n;i++) sizes[i]=fixed||dv.getUint32(stsz.body+12+i*4);
+      const nch=dv.getUint32(stco.body+4), big=stco.type==='co64', co=new Float64Array(nch);
+      for(let i=0;i<nch;i++) co[i]=big? Number(dv.getBigUint64(stco.body+8+i*8)) : dv.getUint32(stco.body+8+i*4);
+      const offs=new Float64Array(n), ne=dv.getUint32(stsc.body+4); let si=0;
+      for(let e=0;e<ne;e++){ const fc=dv.getUint32(stsc.body+8+e*12)-1, spc=dv.getUint32(stsc.body+12+e*12), lc=e+1<ne? dv.getUint32(stsc.body+8+(e+1)*12)-1 : nch;
+        for(let c=fc;c<lc&&si<n;c++){ let o=co[c]; for(let k=0;k<spc&&si<n;k++){ offs[si]=o; o+=sizes[si]; si++; } } }
+      const dts=new Float64Array(n), dur=new Float64Array(n); let t=0, i=0; const nts=dv.getUint32(stts.body+4);
+      for(let e=0;e<nts;e++){ const c=dv.getUint32(stts.body+8+e*8), d=dv.getUint32(stts.body+12+e*8); for(let k=0;k<c&&i<n;k++){ dts[i]=t; dur[i]=d; t+=d; i++; } }
+      for(;i<n;i++){ dts[i]=t; dur[i]=dur[i-1]||1; t+=dur[i]; }
+      const cts=Float64Array.from(dts); const ctts=box('ctts');
+      if(ctts){ const nc=dv.getUint32(ctts.body+4); let j=0; for(let e=0;e<nc;e++){ const c=dv.getUint32(ctts.body+8+e*8), o=dv.getInt32(ctts.body+12+e*8); for(let k=0;k<c&&j<n;k++){ cts[j]+=o; j++; } } }
+      let sync=null; const stss=box('stss'); if(stss){ sync=new Uint8Array(n); const ns=dv.getUint32(stss.body+4); for(let e=0;e<ns;e++){ const x=dv.getUint32(stss.body+8+e*4)-1; if(x>=0&&x<n) sync[x]=1; } }
+      // edit list: where the first shown frame really starts (browsers use it the same way)
+      let shift=0; const elst=MP4.find(u,dv,trak,['edts','elst']);
+      if(elst){ const v1=u[elst.body]===1, ne2=dv.getUint32(elst.body+4); let lead=0; let p2=elst.body+8;
+        for(let e=0;e<ne2;e++){ const sd=v1?Number(dv.getBigUint64(p2)):dv.getUint32(p2), mt=v1?Number(dv.getBigInt64(p2+8)):dv.getInt32(p2+4); p2+=v1?20:12;
+          if(mt===-1){ lead+=sd/mvTs; continue; } shift=lead-mt/ts; break; } }
+      Object.assign(tr,{n,sizes,offs,dts,cts,dur,sync,shift});
+      tracks.push(tr);
+    }
+    return {mvTs,tracks,video:tracks.find(t=>t.kind==='vide')||null,audio:tracks.find(t=>t.kind==='soun')||null};
+  })().catch(e=>{ console.warn('mp4 parse',e); return null; });
+  mp4Cache.set(blob,job); return job;
+}
+// reads byte ranges of a file through a small rolling window, so frames that sit next to each other cost one read
+function byteReader(blob){ let ws=0, we=0, wb=null;
+  return async(off,size)=>{ if(!wb||off<ws||off+size>we){ ws=off; we=Math.min(blob.size,off+Math.max(size,2<<20)); wb=new Uint8Array(await blob.slice(ws,we).arrayBuffer()); } return wb.subarray(off-ws,off-ws+size); }; }
+
+// hands out the exact decoded frame for any time in a video, decoding forward from the keyframe before it
+class FrameDecoder{
+  constructor(blob,tr){ this.blob=blob; this.tr=tr; this.read=byteReader(blob); this.q=[]; this.cur=null; this.err=null; this.pos=-1; this.wake=null;
+    this.pts=new Float64Array(tr.n); for(let i=0;i<tr.n;i++) this.pts[i]=tr.cts[i]/tr.ts+tr.shift;
+    this.cfg={codec:tr.codec,description:tr.desc,codedWidth:tr.w,codedHeight:tr.h,optimizeForLatency:true}; }
+  static async open(m){
+    if(!window.VideoDecoder||!window.EncodedVideoChunk||!m.blob) return null;
+    const pm=await parseMp4(m.blob); if(!pm||!pm.video) return null;
+    try{ const s=await VideoDecoder.isConfigSupported({codec:pm.video.codec,description:pm.video.desc,codedWidth:pm.video.w,codedHeight:pm.video.h}); if(!s.supported) return null; }catch(e){ return null; }
+    const d=new FrameDecoder(m.blob,pm.video); d.start(); return d; }
+  start(){ this.dec=new VideoDecoder({output:f=>{ let i=this.q.length; while(i>0&&this.q[i-1].timestamp>f.timestamp) i--; this.q.splice(i,0,f); if(this.wake){ const w=this.wake; this.wake=null; w(); } },
+    error:e=>{ this.err=e||new Error('decode'); if(this.wake){ const w=this.wake; this.wake=null; w(); } }}); this.dec.configure(this.cfg); }
+  dropAll(){ for(const f of this.q) try{ f.close(); }catch(e){} this.q=[]; if(this.cur) try{ this.cur.close(); }catch(e){} this.cur=null; }
+  keyBefore(t){ const tr=this.tr; let k=0; for(let i=0;i<tr.n;i++){ if((!tr.sync||tr.sync[i]) && this.pts[i]<=t+1e-4) k=i; else if(this.pts[i]>t+2) break; } return k; }
+  restart(t){ this.dropAll(); try{ this.dec.reset(); }catch(e){} this.dec.configure(this.cfg); this.pos=this.keyBefore(t); this.flushed=false; this.eof=false; }
+  async feed(){
+    const tr=this.tr; let fed=0;
+    while(this.pos<tr.n && this.dec.decodeQueueSize<6 && fed<8){ const i=this.pos++;
+      const data=await this.read(tr.offs[i],tr.sizes[i]);
+      this.dec.decode(new EncodedVideoChunk({type:(!tr.sync||tr.sync[i])?'key':'delta',timestamp:Math.round(this.pts[i]*1e6),duration:Math.round(tr.dur[i]/tr.ts*1e6),data})); fed++; }
+    await new Promise(r=>{ this.wake=r; setTimeout(r,fed?30:5); });
+  }
+  async frameAt(t){
+    if(this.err) throw this.err;
+    const tu=Math.round((t+.001)*1e6);
+    const ahead=this.cur? t-this.cur.timestamp/1e6 : 0;
+    if(this.pos<0 || (this.cur && tu<this.cur.timestamp) || (!this.cur && this.q.length && tu<this.q[0].timestamp) || (ahead>2.5 && this.keyBefore(t)>this.pos)) this.restart(t);
+    for(let guard=0;guard<20000;guard++){
+      if(this.err) throw this.err;
+      while(this.q.length && this.q[0].timestamp<=tu){ if(this.cur) this.cur.close(); this.cur=this.q.shift(); }
+      if(this.q.length || this.eof) return this.cur||this.q[0]||null;
+      if(this.pos<this.tr.n) await this.feed();
+      else if(!this.flushed){ this.flushed=true; try{ await this.dec.flush(); }catch(e){} }
+      else this.eof=true;
+    }
+    return this.cur;
+  }
+  close(){ this.dropAll(); try{ this.dec.close(); }catch(e){} }
+}
+// fallback for files the hardware decoder can't take: seek a hidden player to each frame (slower, still exact)
+class SeekReader{
+  constructor(m){ const v=document.createElement('video'); v.muted=true; v.playsInline=true; v.setAttribute('playsinline',''); v.preload='auto'; v.src=m.url;
+    v.style.cssText='position:fixed;left:0;top:0;width:4px;height:4px;opacity:.01;pointer-events:none'; document.body.appendChild(v); this.v=v; this.at=-1; }
+  async frameAt(t){ const v=this.v; if(!this.ready){ await readyFrame(v,15000); this.ready=true; }
+    t=Math.max(0,Math.min(t+.001,(v.duration||t+1)-.001));   // a hair past the frame's start: WebM rounds frame times to whole milliseconds
+    if(Math.abs(this.at-t)>1e-4){ v.currentTime=t; await waitEvt(v,'seeked','error',8000).catch(()=>{});
+      if(v.requestVideoFrameCallback) await Promise.race([new Promise(r=>v.requestVideoFrameCallback(()=>r())),new Promise(r=>setTimeout(r,150))]); this.at=t; }
+    return v; }
+  close(){ const v=this.v; v.removeAttribute('src'); v.load(); v.remove(); }
+}
+const frameOv=new Map();   // clip id -> {src,sw,sh,raw} while exporting
+
+/* sound: everything is mixed offline, sample-exact, then encoded */
+function decodeAudio(ac,buf){ return new Promise((res,rej)=>{ try{ const p=ac.decodeAudioData(buf,res,rej); if(p&&p.then) p.then(res,rej); }catch(e){ rej(e); } }); }
+// the AAC frames of a video's soundtrack between two times, wrapped so the browser's audio decoder can read them
+async function aacSlice(m,from,to){
+  const pm=await parseMp4(m.blob); const tr=pm&&pm.audio; if(!tr||tr.aot<1||tr.aot>4) return null;
+  const read=byteReader(m.blob), fdur=1024/tr.sr; let a=-1, b=-1;
+  for(let i=0;i<tr.n;i++){ const t=tr.cts[i]/tr.ts+tr.shift; if(a<0 && t+fdur>=from-3*fdur) a=i; if(t<=to+fdur) b=i; else if(a>=0) break; }
+  if(a<0||b<a) return null;
+  let total=0; for(let i=a;i<=b;i++) total+=tr.sizes[i]+7;
+  const out=new Uint8Array(total); let o=0;
+  for(let i=a;i<=b;i++){ const s=tr.sizes[i], L=s+7, d=await read(tr.offs[i],s);
+    out[o]=0xFF; out[o+1]=0xF1; out[o+2]=((tr.aot-1)<<6)|(tr.fi<<2)|(tr.cc>>2); out[o+3]=((tr.cc&3)<<6)|(L>>11); out[o+4]=(L>>3)&255; out[o+5]=((L&7)<<5)|31; out[o+6]=0xFC; out.set(d,o+7); o+=L; }
+  return {buf:out.buffer, t0:tr.cts[a]/tr.ts+tr.shift, frames:b-a+1, sr:tr.sr};
+}
+async function clipSound(ac,m,from,to){
+  // a video's own sound: read just the stretch that's used (whole-file decoding would run a phone out of memory)
+  if(m.kind==='video'){
+    const s=await aacSlice(m,from,to).catch(()=>null);
+    if(s){ const ab=await decodeAudio(ac,s.buf).catch(()=>null); if(ab){
+      // some decoders drop the encoder's 2112-sample start-up delay, some don't: measure which, so lips stay in sync
+      const expect=s.frames*1024*ac.sampleRate/s.sr, trimmed=Math.abs(ab.length-(expect-2112*ac.sampleRate/s.sr))<Math.abs(ab.length-expect);
+      return {ab, t0:s.t0+(trimmed?2112/s.sr:0)}; } }
+    if(m.blob.size>(isIOS?60e6:200e6)) return null;
+  }
+  const ab=await decodeAudio(ac,await m.blob.arrayBuffer()).catch(()=>null); return ab?{ab,t0:0}:null;
+}
+async function renderMix(tot,onProg){
+  const sr=48000, OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; if(!OAC) return null;
+  const ac=new OAC(2,Math.max(1,Math.ceil(tot*sr)),sr); let any=false;
+  const curve=(g,t0,d,from,to)=>{ const N=24, arr=new Float32Array(N); for(let i=0;i<N;i++){ const e=ease(i/(N-1)); arr[i]=from+(to-from)*e; } try{ g.gain.setValueCurveAtTime(arr,t0,Math.max(.01,d)); }catch(e){} };
+  const songs=new Map(), jobs=P.audio.length+P.clips.length; let done=0;
+  for(const a of P.audio){ const m=media[a.mediaId]; done++; if(!m||!m.blob||!(a.volume>0)) continue;
+    let s=songs.get(m.id); if(!s){ s=await decodeAudio(ac,await m.blob.arrayBuffer()).catch(()=>null); songs.set(m.id,s); }
+    if(!s) continue; const d=a.out-a.in, src=ac.createBufferSource(), g=ac.createGain(); src.buffer=s; src.connect(g); g.connect(ac.destination);
+    const v=a.volume, fi=Math.min(a.fadeIn||0,d/2), fo=Math.min(a.fadeOut||0,d/2);
+    g.gain.setValueAtTime(fi>0?0:v,a.start); if(fi>0) g.gain.linearRampToValueAtTime(v,a.start+fi);
+    if(fo>0){ g.gain.setValueAtTime(v,a.start+d-fo); g.gain.linearRampToValueAtTime(0,a.start+d); }
+    src.start(a.start,a.in,d); any=true; onProg&&onProg(done/jobs); }
+  const cs=P.clips; layout();
+  for(let i=0;i<cs.length;i++){ const c=cs[i], m=media[c.mediaId]; done++; onProg&&onProg(done/jobs); if(!m||m.kind!=='video'||!(c.volume>0)) continue;
+    const dIn=i>0?trDur(cs[i-1],c):0, dOut=i<cs.length-1?trDur(c,cs[i+1]):0;
+    let t0=c._s-dIn/2; const t1=c._s+c._d+dOut/2; let off=c.in+(t0-c._s)*c.speed; if(off<0){ t0-=off/c.speed; off=0; }
+    const endSrc=Math.min(m.dur,c.in+(t1-c._s)*c.speed); if(endSrc<=off) continue;
+    const snd=await clipSound(ac,m,off,endSrc); if(!snd) continue;
+    const src=ac.createBufferSource(), g=ac.createGain(); src.buffer=snd.ab; src.playbackRate.value=c.speed; src.connect(g); g.connect(ac.destination);
+    const v=c.volume; g.gain.setValueAtTime(dIn>0?0:v,Math.max(0,t0));
+    if(dIn>0) curve(g,Math.max(0,c._s-dIn/2),dIn,0,v);
+    if(dOut>0){ g.gain.setValueAtTime(v,c._s+c._d-dOut/2); curve(g,c._s+c._d-dOut/2,dOut,v,0); }
+    const bo=Math.max(0,off-snd.t0), len=(endSrc-off);
+    src.start(Math.max(0,t0),bo,len); any=true; }
+  if(!any) return null;
+  const out=await new Promise((res,rej)=>{ ac.oncomplete=e=>res(e.renderedBuffer); const p=ac.startRendering(); if(p&&p.then) p.then(res,rej); });
+  return out;
+}
+// H.264 first (plays everywhere, and it's what iPhones encode in hardware); VP9 only for browsers without H.264
+const canPlayMp4=c=>{ try{ const v=document.createElement('video'); return !!v.canPlayType(`video/mp4; codecs="${c}"`); }catch(e){ return false; } };
+async function pickVideoCodec(w,h){
+  if(!window.VideoEncoder||!window.VideoFrame) return null;
+  const mbs=Math.ceil(w/16)*Math.ceil(h/16), lv=mbs<=8192?'28':mbs<=22080?'32':'33', br=Math.round(Math.min(20e6,w*h*30*.16));
+  const tryCfg=async cfg=>{ for(const c of [cfg,(({bitrateMode,...r})=>r)(cfg)]){ try{ const s=await VideoEncoder.isConfigSupported(c); if(s.supported) return c; }catch(e){} } return null; };
+  for(const prof of ['6400','4d00','4200']){ const c=await tryCfg({codec:`avc1.${prof}${lv}`,width:w,height:h,bitrate:br,framerate:FPS,latencyMode:'realtime',bitrateMode:'variable',avc:{format:'avc'}}); if(c) return {cfg:c,mux:'avc'}; }
+  if(canPlayMp4('vp09.00.10.08')){ const c=await tryCfg({codec:'vp09.00.40.08',width:w,height:h,bitrate:br,framerate:FPS,latencyMode:'realtime',bitrateMode:'variable'}); if(c) return {cfg:c,mux:'vp9'}; }
+  return null;
+}
+async function pickAudioCodec(){
+  if(!window.AudioEncoder||!window.AudioData) return null;
+  for(const [codec,mux,play] of [['mp4a.40.2','aac','mp4a.40.2'],['opus','opus','opus']]){ if(!canPlayMp4(play)) continue;
+    const cfg={codec,sampleRate:48000,numberOfChannels:2,bitrate:192000};
+    try{ const s=await AudioEncoder.isConfigSupported(cfg); if(s.supported) return {cfg,mux}; }catch(e){} }
+  return null;
+}
+// can every video in the edit be read frame by frame by the hardware decoder? (MP4/MOV with H.264, HEVC, VP9 or AV1)
+async function canDecode(m){
+  if(m._canDec!==undefined) return m._canDec;
+  let ok=false; try{ if(window.VideoDecoder && m.blob){ const pm=await parseMp4(m.blob); if(pm&&pm.video){ const s=await VideoDecoder.isConfigSupported({codec:pm.video.codec,description:pm.video.desc,codedWidth:pm.video.w,codedHeight:pm.video.h}); ok=!!s.supported; } } }catch(e){}
+  m._canDec=ok; return ok;
+}
+async function allDecodable(){ for(const id of new Set(P.clips.map(c=>c.mediaId))){ const m=media[id]; if(m&&m.kind==='video' && !(await canDecode(m))) return false; } return true; }
+async function exactExportReady(w,h,needSound){ const v=await pickVideoCodec(w,h); if(!v||!window.Mp4Muxer) return false; if(needSound && !(await pickAudioCodec())) return false; return await allDecodable(); }
+const hasSound=()=>P.audio.some(a=>a.volume>0&&media[a.mediaId])||P.clips.some(c=>c.volume>0&&media[c.mediaId]&&media[c.mediaId].kind==='video');
+
+async function exportExact(k){
+  ensureAudio(); setPlaying(false); sel=null; renderTL();
+  const [w0,h0]=ASPECTS[P.aspect]; let w=Math.round(w0*k/2)*2, h=Math.round(h0*k/2)*2;
+  let vc=await pickVideoCodec(w,h);
+  if(!vc && k>1){ w=Math.round(w0/2)*2; h=Math.round(h0/2)*2; vc=await pickVideoCodec(w,h); if(vc) toast('High quality isn’t available on this device, so Standard was used'); }
+  if(!vc) return false;
+  const snd=hasSound(), ac=snd?await pickAudioCodec():null; if(snd&&!ac) return false;
+  if(!(await allDecodable())) return false;   // e.g. WebM clips: recording in real time is quicker than seeking every frame
+  exporting={k,offline:true,cancel:false}; const ex=exporting;
+  for(const r of vpool) freeSlot(r); for(const r of els.values()){ try{ r.el.pause(); }catch(e){} }
+  setCanvasSize(w,h);
+  const tot=total(), N=Math.max(1,Math.round(tot*FPS));
+  $('#exBody').innerHTML=`<div style="display:grid;gap:12px"><div class="bar"><i id="exBar"></i></div>
+    <div class="stat"><span id="exStep">Mixing the sound</span><b id="exT">0%</b></div>
+    <p class="note" style="margin:0">Every frame is built one by one, so cuts land exactly on time in the file. Keep this screen open until it finishes.</p>
+    <div class="mfoot"><button class="btn ghost" id="exStop">Cancel export</button></div></div>`;
+  $('#exStop').onclick=()=>{ ex.cancel=true; };
+  let hi=0; const prog=(f,label)=>{ if(f>hi) hi=f; const b=$('#exBar'), t=$('#exT'), s=$('#exStep'); if(b) b.style.width=(hi*100).toFixed(1)+'%'; if(t) t.textContent=Math.floor(hi*100)+'%'; if(s&&label) s.textContent=label; };
+  let lock=null; try{ if(navigator.wakeLock) lock=await navigator.wakeLock.request('screen'); }catch(e){}
+  const readers=new Map(); let fail=null, venc=null, aenc=null;
+  try{
+    for(const c of P.clips){ const m=media[c.mediaId]; if(m&&m.kind==='video') await checkRotation(m); }
+    // 1. sound
+    let mix=null; if(snd){ mix=await renderMix(tot,f=>prog(f*.08,'Mixing the sound')); }
+    if(ex.cancel) throw new Error('cancel');
+    const target=new Mp4Muxer.ArrayBufferTarget();
+    const muxer=new Mp4Muxer.Muxer({target,video:{codec:vc.mux,width:w,height:h,frameRate:FPS},audio:mix?{codec:ac.mux,numberOfChannels:2,sampleRate:48000}:undefined,fastStart:'in-memory',firstTimestampBehavior:'offset'});
+    if(mix){
+      aenc=new AudioEncoder({output:(c,m)=>muxer.addAudioChunk(c,m),error:e=>{ fail=e; }}); aenc.configure(ac.cfg);
+      const L=mix.getChannelData(0), R=mix.getChannelData(1), step=4096;
+      for(let i=0;i<mix.length;i+=step){ const n=Math.min(step,mix.length-i), d=new Float32Array(n*2); d.set(L.subarray(i,i+n),0); d.set(R.subarray(i,i+n),n);
+        const ad=new AudioData({format:'f32-planar',sampleRate:48000,numberOfFrames:n,numberOfChannels:2,timestamp:Math.round(i/48000*1e6),data:d}); aenc.encode(ad); ad.close();
+        if(aenc.encodeQueueSize>16) await new Promise(r=>setTimeout(r,0)); }
+      await aenc.flush(); if(fail) throw fail;
+    }
+    prog(.1,'Building frames');
+    // 2. pictures
+    venc=new VideoEncoder({output:(c,m)=>muxer.addVideoChunk(c,m),error:e=>{ fail=e; }}); venc.configure(vc.cfg);
+    const t0=performance.now(); layout();
+    const readerFor=async c=>{ let r=readers.get(c.id); if(r) return r; const m=media[c.mediaId];
+      r=await FrameDecoder.open(m).catch(()=>null) || new SeekReader(m); readers.set(c.id,r); return r; };
+    for(let i=0;i<N;i++){
+      if(ex.cancel) throw new Error('cancel'); if(fail) throw fail;
+      const t=i/FPS; T=t; const v=visualAt(t); frameOv.clear();
+      for(const c of (v?[v.a,v.b].filter(Boolean):[])){ const m=media[c.mediaId]; if(!m||m.kind!=='video') continue;
+        let st=c.in+(t-c._s)*c.speed; if(st<0) st=c.in; st=Math.min(st,Math.max(0,m.dur-.001));
+        let r=await readerFor(c), f=null;
+        try{ f=await r.frameAt(st); }catch(e){ console.warn('frame decode',e); try{ r.close(); }catch(_){} r=new SeekReader(m); readers.set(c.id,r); f=await r.frameAt(st).catch(()=>null); }
+        if(!f) continue;
+        if(r instanceof FrameDecoder) frameOv.set(c.id,{src:f,sw:f.displayWidth,sh:f.displayHeight,raw:true});
+        else if(f.videoWidth) frameOv.set(c.id,{src:f,sw:f.videoWidth,sh:f.videoHeight,raw:false});
+      }
+      // finished clips let go of their decoder
+      for(const [id,r] of readers){ const c=P.clips.find(x=>x.id===id); if(!c || t>c._s+c._d+1.2){ try{ r.close(); }catch(e){} readers.delete(id); } }
+      draw();
+      const vf=new VideoFrame(cv,{timestamp:Math.round(i*1e6/FPS),duration:Math.round(1e6/FPS)});
+      venc.encode(vf,{keyFrame:i%(FPS*2)===0}); vf.close();
+      while(venc.encodeQueueSize>3 && !fail) await new Promise(r=>setTimeout(r,2));
+      if(i%3===0){ const el=(performance.now()-t0)/1000, left=el/(i+1)*(N-i-1);
+        prog(.1+.88*(i+1)/N, `Frame ${i+1} of ${N}${i>15?` · about ${left<60?Math.ceil(left)+' s':Math.ceil(left/60)+' min'} left`:''}`); await new Promise(r=>setTimeout(r,0)); }
+    }
+    await venc.flush(); if(fail) throw fail;
+    muxer.finalize(); prog(1,'Done');
+    frameOv.clear(); for(const r of readers.values()) try{ r.close(); }catch(e){}
+    try{ venc.close(); }catch(e){} try{ aenc&&aenc.close(); }catch(e){}
+    exporting=null; applyAspect(false); dirty=true; if(lock) try{ lock.release(); }catch(e){}
+    showExportResult(new Blob([target.buffer],{type:'video/mp4'}),'mp4');
+  }catch(e){
+    frameOv.clear(); for(const r of readers.values()) try{ r.close(); }catch(_){}
+    try{ venc&&venc.close(); }catch(_){} try{ aenc&&aenc.close(); }catch(_){}
+    exporting=null; applyAspect(false); dirty=true; if(lock) try{ lock.release(); }catch(_){}
+    if(e&&e.message==='cancel'){ $('#exportModal').hidden=true; toast('Export cancelled'); return true; }
+    console.warn('exact export',e);
+    $('#exBody').innerHTML=`<p class="note" style="margin:0">The export stopped part-way (${esc(String(e&&e.message||e)).slice(0,120)}).</p><div class="mfoot"><button class="btn ghost" id="exCancel">Close</button><button class="btn primary" id="exLive">Export in real time instead</button></div>`;
+    $('#exCancel').onclick=()=>{ $('#exportModal').hidden=true; }; $('#exLive').onclick=()=>startExport(k,pickMime(),true);
+  }
+  return true;
+}
+
 let rec=null, chunks=[], downloadsP=null, lastBlob=null;
 try{ downloadsP = window.claude && window.claude.use ? window.claude.use('downloads').catch(()=>null) : Promise.resolve(null); }catch(e){ downloadsP=Promise.resolve(null); }
 function pickMime(){
@@ -2167,20 +2537,25 @@ function pickMime(){
 }
 function openExport(){
   setPlaying(false);
-  const mime=pickMime(), ok=mime && cv.captureStream;
+  const mime=pickMime(), ok=(mime && cv.captureStream) || !!window.VideoEncoder;
   const [w,h]=ASPECTS[P.aspect];
   $('#exBody').innerHTML= ok ? `<div style="display:grid;gap:14px">
       ${field('Quality',`<div class="chips" id="exQ"><button class="chip on" data-q="1">Standard · ${w}×${h}</button><button class="chip" data-q="1.5">High · ${w*1.5}×${h*1.5}</button></div>`)}
-      <div class="stat">Length<b>${fmtTC(total())}</b></div><div class="stat">Format<b>${mime.startsWith('video/mp4')?'MP4':'WebM'} · ${FPS} fps</b></div>
-      <p class="note">Export plays your edit through once in real time, so a ${fmtD(total())} edit takes about ${fmtD(total()+1)}. Keep this tab in front until it finishes.</p>
+      <div class="stat">Length<b>${fmtTC(total())}</b></div><div class="stat">Format<b id="exFmt">${mime&&!mime.startsWith('video/mp4')?'WebM':'MP4'} · ${FPS} fps</b></div>
+      <p class="note" id="exHow">Checking this device…</p>
       <div class="mfoot"><button class="btn ghost" id="exCancel">Close</button><button class="btn primary" id="exGo">Start export</button></div></div>`
     : `<p class="note">This browser can't record the canvas to a video file. Open Splice Studio in Chrome, Edge or Firefox on a computer to export.</p><div class="mfoot"><button class="btn" id="exCancel">Close</button></div>`;
   $('#exportModal').hidden=false;
   $('#exCancel').onclick=()=>{ $('#exportModal').hidden=true; };
   const q=$('#exQ'); if(q) q.onclick=e=>{ const b=e.target.closest('[data-q]'); if(!b) return; q.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===b)); };
   const go=$('#exGo'); if(go) go.onclick=()=>startExport(+$('#exQ .chip.on').dataset.q, mime);
+  if(ok) exactExportReady(Math.round(w/2)*2,Math.round(h/2)*2,hasSound()).then(y=>{ const n=$('#exHow'), f=$('#exFmt'); if(!n) return;
+    if(y){ n.textContent='Every frame is built one at a time, so cuts land exactly on time and nothing stutters, however busy the phone is. Usually quicker than the edit\u2019s length.'; if(f) f.textContent=`MP4 · ${FPS} fps`; }
+    else n.textContent=`This device plays your edit through once in real time to record it, so a ${fmtD(total())} edit takes about ${fmtD(total()+1)}. Keep this screen in front until it finishes.`; });
 }
-async function startExport(k,mime){
+async function startExport(k,mime,live){
+  if(!live){ $('#exBody').innerHTML='<p class="note" style="margin:0">Getting ready…</p>'; if(await exportExact(k)) return; }
+  if(!mime||!cv.captureStream){ $('#exBody').innerHTML=`<p class="note">This browser can't export video. Update iOS, or use Chrome, Edge or Safari on a computer.</p><div class="mfoot"><button class="btn" id="exCancel">Close</button></div>`; $('#exCancel').onclick=()=>{ $('#exportModal').hidden=true; }; return; }
   ensureAudio(); unlockVideos(); setPlaying(false); sel=null; renderTL();
   const [w,h]=ASPECTS[P.aspect]; exporting={k,mime,cancel:false};
   setCanvasSize(w*k,h*k); T=0; syncMedia();
@@ -2205,8 +2580,11 @@ function onRecStop(){
   const ex=exporting; exporting=null; if(spk) spk.gain.value=1; applyAspect(false);
   if(!ex||ex.cancel){ $('#exportModal').hidden=true; toast('Export cancelled'); return; }
   const type=ex.mime.split(';')[0], ext=type==='video/mp4'?'mp4':'webm';
+  showExportResult(new Blob(chunks,{type}),ext);
+}
+function showExportResult(blob,ext){
   if(window.__exURL) try{ URL.revokeObjectURL(window.__exURL); }catch(e){}
-  lastBlob=new Blob(chunks,{type}); const url=window.__exURL=URL.createObjectURL(lastBlob);
+  lastBlob=blob; const url=window.__exURL=URL.createObjectURL(lastBlob);
   const name=(($('#projName').value||'Splice edit').replace(/[^\w\- ]+/g,'').trim()||'Splice edit')+'.'+ext;
   $('#exBody').innerHTML=`<div style="display:grid;gap:12px"><video id="outVid" src="${url}" controls playsinline></video>
     <div class="stat">File<b>${esc(name)} · ${(lastBlob.size/1048576).toFixed(1)} MB</b></div>
@@ -2412,7 +2790,7 @@ function persistMedia(m){
 }
 function mediaMeta(m){
   return {id:m.id,name:m.name,kind:m.kind,chunks:m.chunks,size:m.size,type:m.type,dur:isFinite(m.dur)?m.dur:null,w:m.w,h:m.h,sample:!!m.sample,
-    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null,taken:m.taken||null,takenSrc:m.takenSrc||null,added:m.added||null,rot:m.rot||0,rotUser:!!m.rotUser,metaRot:m.metaRot||0,metaChecked:!!m.metaChecked,orient:m.orient||null,vendChecked:!!m.vendChecked,analysis:m.analysis||null,pixabay:!!m.pixabay,credit:m.credit||null,pageURL:m.pageURL||null};
+    thumb:m.kind==='image'?null:(m.thumb||null),strip:m.strip||null,wave:m.wave||null,taken:m.taken||null,takenSrc:m.takenSrc||null,added:m.added||null,rot:m.rot||0,rotUser:!!m.rotUser,metaRot:m.metaRot||0,metaChecked:!!m.metaChecked,metaTag:m.metaTag,camPhoto:m.camPhoto,orient:m.orient||null,vendChecked:!!m.vendChecked,analysis:m.analysis||null,pixabay:!!m.pixabay,credit:m.credit||null,pageURL:m.pageURL||null};
 }
 async function readMediaData(mr){
   if(mr.blob) return mr.blob;                         // saved by an older version: still readable, re-saved in pieces on next change
@@ -2448,7 +2826,8 @@ async function openProject(id){
   let missing=0;
   for(const mid of rec.mediaIds||[]){
     const mr=await DB.get('media',mid).catch(()=>null); const blob=mr&&await readMediaData(mr).catch(()=>null); if(!blob){ missing++; continue; } mr.blob=blob;
-    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave,taken:mr.taken||null,takenSrc:mr.takenSrc||null,added:mr.added||0,rot:mr.rot||0,rotUser:!!mr.rotUser,metaRot:mr.metaRot||0,metaChecked:!!mr.metaChecked,orient:mr.orient||null,blobSaved:!!mr.chunks,chunks:mr.chunks,size:mr.size,type:mr.type,vendChecked:!!mr.vendChecked,analysis:mr.analysis||null,pixabay:!!mr.pixabay,credit:mr.credit||null,pageURL:mr.pageURL||null};
+    const m={id:mr.id,name:mr.name,kind:mr.kind,blob:mr.blob,url:URL.createObjectURL(mr.blob),dur:mr.dur==null?Infinity:mr.dur,w:mr.w,h:mr.h,sample:mr.sample,thumb:mr.thumb,strip:mr.strip,wave:mr.wave,taken:mr.taken||null,takenSrc:mr.takenSrc||null,added:mr.added||0,rot:mr.rot||0,rotUser:!!mr.rotUser,metaRot:mr.metaRot||0,metaChecked:!!mr.metaChecked,metaTag:mr.metaTag,camPhoto:mr.camPhoto,orient:mr.orient||null,blobSaved:!!mr.chunks,chunks:mr.chunks,size:mr.size,type:mr.type,vendChecked:!!mr.vendChecked,analysis:mr.analysis||null,pixabay:!!mr.pixabay,credit:mr.credit||null,pageURL:mr.pageURL||null};
+    if(!m.rotUser && m.orient && (m.orient.v||0)<6){ if(m.rot) m.rot=0; m.orient=null; persistMedia(m); }   // older automatic turns were often wrong: undo them
     try{
       if(m.kind==='image'){ const img=new Image(); img.src=m.url; await img.decode(); m.img=img; m.w=img.naturalWidth; m.h=img.naturalHeight; m.thumb=m.url; m.dur=Infinity; }
       else if(m.kind==='video' && !m.strip) makeStrip(m).then(()=>persistMedia(m));
@@ -2594,9 +2973,21 @@ async function analyseVideoMedia(m,onProg,run){
 }
 
 /* ---- which way is up? ----
-   Files that record how the phone was held already show the right way up. This is for shots where the picture
-   itself is sideways (rotation lock, phone held flat). It reads the scene the way an editor would: light and sky
-   at the top, grass and ground at the bottom, and only turns a shot when that's clear in most of its frames. */
+   The camera is the authority. Phones record how they were held: videos carry an orientation tag (0° counts too)
+   and photos carry EXIF, and browsers already show both the right way up. Those files are never turned here.
+   Only a file with no such record (a screen recording, a WebM, a picture saved from a website) is read for clues,
+   and even then only a clearly sideways shot is turned; an automatic upside-down flip is never made, because
+   night skies, bright floors and sunlit grass fool any picture-only guess far more often than a shot is upside down. */
+async function hasCameraPhotoInfo(m){
+  if(m.camPhoto!==undefined) return m.camPhoto;
+  let yes=false;
+  try{ const u=new Uint8Array(await m.blob.slice(0,512*1024).arrayBuffer());
+    // "Exif\0\0" (JPEG, HEIC, WebP, PNG eXIf) or an HEIF/AVIF container from a camera
+    for(let i=0;i<u.length-6;i++){ if(u[i]===0x45&&u[i+1]===0x78&&u[i+2]===0x69&&u[i+3]===0x66&&u[i+4]===0&&u[i+5]===0){ yes=true; break; } }
+    if(!yes && u.length>12){ const brand=String.fromCharCode(...u.slice(8,12)); if(/^(heic|heix|hevc|mif1|msf1)$/.test(brand)) yes=true; }
+  }catch(e){}
+  m.camPhoto=yes; return yes;
+}
 function upScores(src,sw,sh){
   const N=48, c=document.createElement('canvas'); c.width=N; c.height=N; const g=c.getContext('2d',{willReadFrequently:true});
   g.drawImage(src,0,0,N,N); const d=g.getImageData(0,0,N,N).data;
@@ -2618,8 +3009,10 @@ function upScores(src,sw,sh){
 }
 async function detectUp(m){
   await checkRotation(m);
-  if(m.orient && m.orient.v===5) return m.orient;
+  if(m.orient && m.orient.v===6) return m.orient;
   if(m.orient && !m.rotUser) m.rot=0;      // an earlier automatic turn may have been based on an unturned picture: start again
+  const trusted = m.kind==='video' ? !!m.metaTag : await hasCameraPhotoInfo(m);
+  if(trusted){ m.orient={v:6,rot:0,trusted:true}; persistMedia(m); return m.orient; }
   const votes={0:0,90:0,180:0,270:0}; let frames=0;
   const tally=sc=>{ const k=Object.keys(sc).sort((a,b)=>sc[b]-sc[a]); const best=k[0], second=sc[k[1]];
     frames++;
@@ -2634,9 +3027,9 @@ async function detectUp(m){
     catch(e){} finally{ v.removeAttribute('src'); v.load(); v.remove(); }
   }
   // decide: a turn needs a clear majority of the frames, not just a slight lean
-  const need=m.kind==='image'?1:Math.max(2,Math.ceil(frames*.6));
-  let rot=0; for(const k of [90,180,270]) if(votes[k]>=need && votes[k]>votes[0]*2) rot=+k;
-  m.orient={v:5,rot,votes,frames}; persistMedia(m); return m.orient;
+  const need=m.kind==='image'?1:Math.max(3,Math.ceil(frames*.75));
+  let rot=0; for(const k of [90,270]) if(votes[k]>=need && votes[k]>=votes[0]*3 && votes[k]>(votes[90]+votes[270]-votes[k])*3) rot=+k;
+  m.orient={v:6,rot,votes,frames}; persistMedia(m); return m.orient;
 }
 
 /* ---- 2. find the beat of the song ---- */
@@ -2754,7 +3147,6 @@ async function buildAutoEdit(opts,ui){
     ui.step('Checking which way up each shot is');
     const all=[...vids,...photos]; let k=0;
     for(const m of all){ if(run.cancel) return null; ui.prog(.78+.1*(k++)/all.length); if(m.rotUser) continue;
-      if(m.kind==='video'){ await checkRotation(m); if(m.metaRot){ if(m.orient&&m.rot&&!m.rotUser){ m.rot=0; persistMedia(m); } continue; } }   // the phone recorded how it was held: trust it
       try{ const o=await detectUp(m); if(o.rot && (m.rot||0)!==o.rot){ m.rot=o.rot; persistMedia(m); turned.push(m); } }catch(e){} }
   }
   ui.prog(.88);
