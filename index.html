@@ -216,6 +216,11 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
 .modal h2{margin:0;font:800 20px/1.2 var(--f-brand);letter-spacing:-.01em}
 .bar{height:8px;border-radius:99px;background:var(--raise2);overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--cue);transition:width .2s linear}
+.convbox{position:fixed;left:50%;top:calc(64px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:59;width:min(420px,calc(100% - 32px));
+  background:var(--raise);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:8px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.convbox .stat span{color:var(--fg);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;margin-right:10px}
+.convbox .row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.convbox small{color:var(--muted);font-size:11.5px;line-height:1.35}
 .mfoot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 #outVid{width:100%;max-height:44vh;background:#000;border-radius:6px}
 
@@ -492,8 +497,8 @@ kbd{font:500 11px var(--f-mono);background:var(--raise);border:1px solid var(--l
     <div class="plist" id="plist"></div>
   </div>
 </div>
-<input type="file" id="file" multiple accept="video/*,audio/*,image/*,.mov,.mp4,.m4v,.webm,.jpg,.jpeg,.png,.heic,.webp,.gif,.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,.ogg,.oga,.opus,.m4b" hidden>
-<input type="file" id="fileAudio" multiple accept="audio/*,.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,.ogg,.oga,.opus,.m4b" hidden>
+<input type="file" id="file" multiple accept="video/*,audio/*,image/*,.mov,.mp4,.m4v,.webm,.avi,.wmv,.asf,.mkv,.flv,.f4v,.mpg,.mpeg,.m2v,.mpe,.vob,.ts,.mts,.m2ts,.ogv,.3gp,.3g2,.dv,.mxf,.divx,.rm,.rmvb,.hevc,.wma,.amr,.ac3,.eac3,.mka,.mp2,.aifc,.au,.wv,.ape,.dts,.jpg,.jpeg,.png,.heic,.webp,.gif,.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,.ogg,.oga,.opus,.m4b" hidden>
+<input type="file" id="fileAudio" multiple accept="audio/*,.mp3,.m4a,.aac,.wav,.aif,.aiff,.caf,.flac,.ogg,.oga,.opus,.m4b,.wma,.amr,.ac3,.eac3,.mka,.mp2,.aifc,.au,.wv,.ape,.dts" hidden>
 
 <script>
 (()=>{
@@ -1489,6 +1494,7 @@ async function probe(m,file){
   await waitEvt(el,'loadedmetadata');
   let d=el.duration;
   if(!isFinite(d)){ el.currentTime=1e7; await waitEvt(el,'timeupdate','error',5000).catch(()=>{}); d=isFinite(el.duration)?el.duration:10; }
+  if(m.kind==='video' && !el.videoWidth){ el.removeAttribute('src'); el.load(); throw new Error('nopicture'); }
   m.dur=d; if(m.kind==='video'){ m.w=el.videoWidth; m.h=el.videoHeight; if(file) m.blob=file; checkRotation(m).then(()=>m.strip?null:makeStrip(m)).then(()=>probeVideoEnd(m)); }
   else if(file) file.arrayBuffer().then(b=>makeWave(m,b)).catch(()=>{});
 }
@@ -1661,12 +1667,122 @@ function orderTimelineByDate(){
 }
 
 const EXT_KIND={mp3:'audio',m4a:'audio',m4b:'audio',aac:'audio',wav:'audio',aif:'audio',aiff:'audio',caf:'audio',flac:'audio',ogg:'audio',oga:'audio',opus:'audio',
-  mp4:'video',m4v:'video',mov:'video',webm:'video',mkv:'video','3gp':'video',jpg:'image',jpeg:'image',png:'image',gif:'image',webp:'image',heic:'image',heif:'image',avif:'image'};
+  mp4:'video',m4v:'video',mov:'video',webm:'video',mkv:'video','3gp':'video','3g2':'video',avi:'video',wmv:'video',asf:'video',flv:'video',f4v:'video',
+  mpg:'video',mpeg:'video',m2v:'video',mpe:'video',vob:'video',ts:'video',mts:'video',m2ts:'video',ogv:'video',dv:'video',mxf:'video',divx:'video',rm:'video',rmvb:'video',hevc:'video',
+  wma:'audio',amr:'audio',ac3:'audio',eac3:'audio',mka:'audio',mp2:'audio',aifc:'audio',au:'audio',wv:'audio',ape:'audio',dts:'audio',jpg:'image',jpeg:'image',png:'image',gif:'image',webp:'image',heic:'image',heif:'image',avif:'image'};
 function kindOf(f){
   const t=(f.type||'').toLowerCase(), ext=(f.name.split('.').pop()||'').toLowerCase();
   if(t.startsWith('video/')) return ext in EXT_KIND && EXT_KIND[ext]==='audio'?'audio':'video';   // some systems label .m4a/.webm audio as video
   if(t.startsWith('audio/')) return 'audio'; if(t.startsWith('image/')) return 'image';
   return EXT_KIND[ext]||null;
+}
+
+/* ---- converting formats the browser can't play ----
+   AVI, WMV, MKV, MPG, MTS and friends, or HEVC footage in a browser without HEVC, are turned into a standard MP4
+   (or M4A for sound) right here on the device with FFmpeg. The converter is a one-time ~32 MB download, fetched only
+   the first time it's needed; the browser keeps it after that. */
+const FF_BASE='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/';
+let ffw=null, ffReady=null, ffPend=null;
+const FF_WORKER=`let core=null;
+self.onmessage=async e=>{ const d=e.data;
+  try{
+    if(d.t==='load'){
+      importScripts(d.coreURL);
+      core=await self.createFFmpegCore({mainScriptUrlOrBlob:d.coreURL+'#'+btoa(JSON.stringify({wasmURL:d.wasmURL}))});
+      core.setLogger(l=>postMessage({t:'log',m:l.message}));
+      core.setProgress(p=>postMessage({t:'prog',p:p.progress}));
+      postMessage({t:'ok'}); return;
+    }
+    if(d.t==='run'){
+      try{ core.FS.mkdir('/in'); }catch(_){}
+      core.FS.mount(core.FS.filesystems.WORKERFS,{files:[d.file]},'/in');
+      let ret=-1, out=null;
+      try{ core.exec(...d.args); ret=core.ret; core.reset(); }
+      finally{ try{ core.FS.unmount('/in'); }catch(_){} }
+      if(d.out){ try{ out=core.FS.readFile(d.out); }catch(_){} try{ core.FS.unlink(d.out); }catch(_){} }
+      postMessage({t:'ok',ret,out},out?[out.buffer]:[]);
+    }
+  }catch(err){ postMessage({t:'err',m:String(err&&err.message||err)}); }
+};`;
+function ffKill(){ if(ffw){ try{ ffw.terminate(); }catch(e){} } ffw=null; ffReady=null; if(ffPend){ const p=ffPend; ffPend=null; p.rej(new Error('stopped')); } }
+function ffCall(msg,onProg,onLog){
+  return new Promise((res,rej)=>{
+    ffPend={res,rej,onProg,onLog};
+    ffw.postMessage(msg);
+  });
+}
+function ffLoad(){
+  if(ffReady) return ffReady;
+  ffw=new Worker(URL.createObjectURL(new Blob([FF_WORKER],{type:'text/javascript'})));
+  ffw.onmessage=e=>{ const d=e.data, p=ffPend; if(!p) return;
+    if(d.t==='prog'){ if(p.onProg) p.onProg(d.p); return; }
+    if(d.t==='log'){ if(p.onLog) p.onLog(d.m); return; }
+    ffPend=null; if(d.t==='err'){ try{ ffw.terminate(); }catch(_){} ffw=null; ffReady=null; p.rej(new Error(d.m)); } else p.res(d); };   // a crashed converter is restarted fresh for the next file
+  ffw.onerror=e=>{ e.preventDefault&&e.preventDefault(); const p=ffPend; ffPend=null; try{ ffw.terminate(); }catch(_){} ffw=null; ffReady=null; if(p) p.rej(new Error(e.message||'converter crashed')); };
+  const base=window.FF_BASE||FF_BASE;
+  ffReady=ffCall({t:'load',coreURL:base+'ffmpeg-core.js',wasmURL:base+'ffmpeg-core.wasm'}).catch(e=>{ ffKill(); throw e; });
+  return ffReady;
+}
+async function ffRun(msg,onProg,onLog){ await ffLoad(); return ffCall(msg,onProg,onLog); }
+let convUI=null;
+function convShow(name){
+  if(!convUI){
+    const d=document.createElement('div'); d.className='convbox'; d.setAttribute('role','status');
+    d.innerHTML=`<div class="row"><div class="stat" style="flex:1;min-width:0;padding:0"><span id="convT"></span><b id="convP">0%</b></div><button class="btn ghost" id="convStop" style="min-height:32px;padding:4px 12px">Stop</button></div>
+      <div class="bar"><i id="convBar"></i></div><small id="convN"></small>`;
+    document.body.appendChild(d); convUI={el:d,hi:0,stopped:false};
+    d.querySelector('#convStop').onclick=()=>{ convUI.stopped=true; ffKill(); };
+  }
+  convUI.hi=0; convSet(name,0,'');
+}
+function convSet(text,f,note){ if(!convUI) return;
+  if(text!=null) convUI.el.querySelector('#convT').textContent=text;
+  if(note!=null) convUI.el.querySelector('#convN').textContent=note;
+  if(f!=null && f>=convUI.hi){ convUI.hi=Math.min(1,f); convUI.el.querySelector('#convBar').style.width=(convUI.hi*100).toFixed(1)+'%'; convUI.el.querySelector('#convP').textContent=Math.floor(convUI.hi*100)+'%'; } }
+function convHide(){ if(convUI){ convUI.el.remove(); convUI=null; } }
+async function playsHere(file){   // can this browser actually draw a picture from it?
+  const v=document.createElement('video'); const u=URL.createObjectURL(file); v.src=u;
+  try{ await readyFrame(v,8000); return v.videoWidth>0; }catch(e){ return false; }
+  finally{ v.removeAttribute('src'); v.load(); URL.revokeObjectURL(u); }
+}
+async function convertMedia(f,kind){
+  const base=f.name.replace(/\.[^.]+$/,'')||'clip';
+  convShow(ffReady?`Opening ${f.name}`:`Getting the converter ready for ${f.name}`);
+  convSet(null,null, ffReady?'':'First time only: downloading the converter (about 32 MB). Keep this screen open.');
+  try{ await ffLoad(); }
+  catch(e){ if(convUI&&convUI.stopped) return {stopped:true}; return {err:'load'}; }
+  if(convUI&&convUI.stopped) return {stopped:true};
+  // what's inside?
+  let info='';
+  try{ await ffRun({t:'run',file:f,args:['-hide_banner','-i','/in/'+f.name]},null,m=>{ info+=m+'\n'; }); }catch(e){ if(convUI&&convUI.stopped) return {stopped:true}; }
+  const vc=(info.match(/Stream #[^\n]*Video: (\w+)/)||[])[1]||'', ac=(info.match(/Stream #[^\n]*Audio: (\w+)/)||[])[1]||'';
+  if(kind==='video' && !vc) kind=ac?'audio':kind;   // a "video" file that only holds sound
+  if(!vc && !ac) return {err:'unreadable'};
+  const run=async(args,out,label,note)=>{
+    convSet(label,null,note);
+    const r=await ffRun({t:'run',file:f,args:['-hide_banner','-i','/in/'+f.name,...args,out],out},p=>{ if(p>=0&&p<=1) convSet(null,p,null); });
+    return r.out && r.out.length>1000 ? r.out : null;
+  };
+  const aArgs=ac?(ac==='aac'?['-c:a','copy']:['-c:a','aac','-b:a','192k','-ac','2']):[];
+  try{
+    if(kind==='audio'){
+      const o=await run(['-vn','-map','0:a:0',...(ac==='aac'?['-c:a','copy']:['-c:a','aac','-b:a','192k','-ac','2']),'-movflags','+faststart'],'out.m4a',`Converting ${f.name}`,'Turning it into M4A sound');
+      return o?{file:new File([o],base+'.m4a',{type:'audio/mp4',lastModified:f.lastModified}),kind:'audio'}:{err:'failed'};
+    }
+    // H.264 or HEVC: just repackage into MP4, which takes seconds and keeps full quality
+    if(vc==='h264'||vc==='hevc'){
+      const o=await run(['-map','0:v:0','-map','0:a:0?','-c:v','copy',...(vc==='hevc'?['-tag:v','hvc1']:[]),...aArgs,'-movflags','+faststart','-map_metadata','0'],'out.mp4',`Repackaging ${f.name}`,'Moving it into an MP4 without re-encoding');
+      if(o){ const file=new File([o],base+'.mp4',{type:'video/mp4',lastModified:f.lastModified}); if(await playsHere(file)) return {file,kind:'video'}; }
+      if(convUI&&convUI.stopped) return {stopped:true};
+      convUI.hi=0;
+    }
+    // anything else: re-encode to H.264
+    const MAX=isIOS?1280:1920;
+    const o=await run(['-map','0:v:0','-map','0:a:0?','-vf',`yadif=deint=interlaced,scale=w='min(iw,${MAX})':h='min(ih,${MAX})':force_original_aspect_ratio=decrease:force_divisible_by=2,format=yuv420p`,
+      '-c:v','libx264','-preset','ultrafast','-crf','23',...(ac?['-c:a','aac','-b:a','160k','-ac','2']:[]),'-movflags','+faststart','-map_metadata','0'],'out.mp4',
+      `Converting ${f.name}`,'Re-encoding to MP4 on this device. Takes roughly as long as the video, sometimes longer on a phone.');
+    return o?{file:new File([o],base+'.mp4',{type:'video/mp4',lastModified:f.lastModified}),kind:'video'}:{err:'failed'};
+  }catch(e){ if(convUI&&convUI.stopped) return {stopped:true}; console.warn('convert',e); return {err:/memory|bounds|abort|OOM/i.test(e.message)?'memory':'failed'}; }
 }
 async function importFiles(files){
   const ok=[];
@@ -1674,10 +1790,23 @@ async function importFiles(files){
     const kind=kindOf(f);
     if(!kind){ toast(`${f.name} isn't a video, audio or image file`); continue; }
     const m={id:uid(),name:f.name.replace(/\.[^.]+$/,''),kind,url:URL.createObjectURL(f),added:Date.now()};
-    try{ await probe(m,f); }catch(e){ toast(kind==='audio'?`This browser can\u2019t play ${f.name}. MP3, M4A or WAV work everywhere.`:`Couldn't open ${f.name}. Try MP4, MOV, WebM, JPG or PNG.`); URL.revokeObjectURL(m.url); continue; }
+    let use=f, opened=false;
+    try{ await probe(m,f); opened=true; }catch(e){}
+    if(!opened && kind!=='image'){   // the browser can't play it as-is: convert it on the device
+      URL.revokeObjectURL(m.url); m.url=null;
+      const c=await convertMedia(f,kind);
+      if(c.stopped){ convHide(); toast(`Stopped converting ${f.name}`); break; }
+      if(c.file){ m.kind=c.kind; m.url=URL.createObjectURL(c.file); m.converted=true;
+        try{ await probe(m,c.file); opened=true; use=c.file; }catch(e){ URL.revokeObjectURL(m.url); } }
+      if(!opened){ convHide();
+        const why=c.err==='load'?'The converter couldn\u2019t be downloaded. Check your connection and try again.':c.err==='memory'?'It\u2019s too big to convert on this device. Try a shorter clip.':c.err==='unreadable'?'It doesn\u2019t look like a video or sound file.':'It couldn\u2019t be converted.';
+        toast(`Couldn\u2019t open ${f.name}. ${why}`); await new Promise(r=>setTimeout(r,2600)); continue; }
+    }
+    else if(!opened){ toast(`Couldn't open ${f.name}. Try JPG, PNG, HEIC or WebP.`); URL.revokeObjectURL(m.url); continue; }
     const tk=await readTaken(f); m.taken=tk.t; m.takenSrc=tk.src;
-    m.blob=f; media[m.id]=m; ok.push(m);
+    m.blob=use; media[m.id]=m; ok.push(m);
   }
+  if(convUI){ convHide(); if(ok.some(m=>m.converted)) { const n=ok.filter(m=>m.converted).length; setTimeout(()=>toast(`Converted ${n} file${n>1?'s':''} so ${n>1?'they play':'it plays'} everywhere`),2600); } }
   // a batch lands on the timeline in the order it was shot, whatever order it was picked in
   ok.sort((a,b)=>(a.taken||0)-(b.taken||0));
   const added=[];
