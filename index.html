@@ -2378,16 +2378,56 @@ async function aacSlice(m,from,to){
   for(let i=0;i<tr.n;i++){ const t=tr.cts[i]/tr.ts+tr.shift; if(a<0 && t+fdur>=from-3*fdur) a=i; if(t<=to+fdur) b=i; else if(a>=0) break; }
   if(a<0||b<a) return null;
   let total=0; for(let i=a;i<=b;i++) total+=tr.sizes[i]+7;
-  const out=new Uint8Array(total); let o=0;
+  const out=new Uint8Array(total), raw=[]; let o=0;
   for(let i=a;i<=b;i++){ const s=tr.sizes[i], L=s+7, d=await read(tr.offs[i],s);
-    out[o]=0xFF; out[o+1]=0xF1; out[o+2]=((tr.aot-1)<<6)|(tr.fi<<2)|(tr.cc>>2); out[o+3]=((tr.cc&3)<<6)|(L>>11); out[o+4]=(L>>3)&255; out[o+5]=((L&7)<<5)|31; out[o+6]=0xFC; out.set(d,o+7); o+=L; }
-  return {buf:out.buffer, t0:tr.cts[a]/tr.ts+tr.shift, frames:b-a+1, sr:tr.sr};
+    out[o]=0xFF; out[o+1]=0xF1; out[o+2]=((tr.aot-1)<<6)|(tr.fi<<2)|(tr.cc>>2); out[o+3]=((tr.cc&3)<<6)|(L>>11); out[o+4]=(L>>3)&255; out[o+5]=((L&7)<<5)|31; out[o+6]=0xFC; out.set(d,o+7);
+    raw.push(out.subarray(o+7,o+L)); o+=L; }
+  return {buf:out.buffer, raw, asc:tr.asc, cc:tr.cc, t0:tr.cts[a]/tr.ts+tr.shift, frames:b-a+1, sr:tr.sr};
+}
+// the same frames as a tiny M4A file: every browser's audio decoder reads that
+function aacToM4a(s){
+  const target=new Mp4Muxer.ArrayBufferTarget(), mx=new Mp4Muxer.Muxer({target,audio:{codec:'aac',numberOfChannels:s.cc,sampleRate:s.sr},fastStart:'in-memory',firstTimestampBehavior:'offset'});
+  const fd=1024/s.sr*1e6, meta={decoderConfig:{codec:'mp4a.40.2',sampleRate:s.sr,numberOfChannels:s.cc,description:s.asc}};
+  s.raw.forEach((d,i)=>mx.addAudioChunkRaw(d,'key',Math.round(i*fd),Math.round(fd),i?undefined:meta));
+  mx.finalize(); return target.buffer;
+}
+// AAC encoders put a short silent lead-in (about 44 ms) before the sound. Measure it on this device by encoding a click
+// and decoding it again, then start the mix that much early so sound and picture line up exactly.
+let aacDelay=null;
+async function measureAacDelay(cfg){
+  if(aacDelay!==null) return aacDelay; aacDelay=0;
+  if(!window.AudioDecoder) return 0;
+  try{
+    const sr=48000, N=sr/2, at=8192, pcm=new Float32Array(N*2); for(let k=0;k<48;k++){ const v=Math.sin(k/48*Math.PI)*.9*Math.sin(2*Math.PI*1000*k/sr); pcm[at+k]=v; pcm[N+at+k]=v; }
+    const chunks=[]; const enc=new AudioEncoder({output:c=>{ const d=new Uint8Array(c.byteLength); c.copyTo(d); chunks.push({d,t:c.timestamp,type:c.type}); },error:()=>{}}); enc.configure(cfg);
+    const ad=new AudioData({format:'f32-planar',sampleRate:sr,numberOfFrames:N,numberOfChannels:2,timestamp:0,data:pcm}); enc.encode(ad); ad.close(); await enc.flush(); enc.close();
+    const outs=[]; const dec=new AudioDecoder({output:a=>{ const n=a.numberOfFrames, x=new Float32Array(n); a.copyTo(x,{planeIndex:0,format:'f32-planar'}); outs.push(x); a.close(); },error:()=>{}});
+    dec.configure({codec:'mp4a.40.2',sampleRate:sr,numberOfChannels:2,description:aacConfig(sr,2)});
+    for(const c of chunks){ let d=c.d; if(d.length>7&&d[0]===0xFF&&(d[1]&0xF6)===0xF0){ const hl=(d[1]&1)?7:9; d=d.subarray(hl); } dec.decode(new EncodedAudioChunk({type:'key',timestamp:c.t,data:d})); }
+    await dec.flush(); dec.close();
+    let all=[], pos=-1, i=0; for(const x of outs) for(const v of x){ if(pos<0 && Math.abs(v)>.3) pos=i; i++; }
+    if(pos>=0){ const d=pos-at-12; if(d>=0 && d<6000) aacDelay=d; }   // 12: where the click's envelope crosses the threshold
+  }catch(e){ aacDelay=0; }
+  return aacDelay;
+}
+// AAC decoder setup (AudioSpecificConfig) for AAC-LC
+function aacConfig(sr,ch){ const SR=[96000,88200,64000,48000,44100,32000,24000,22050,16000,12000,11025,8000,7350], fi=Math.max(0,SR.indexOf(sr));
+  return new Uint8Array([(2<<3)|(fi>>1),((fi&1)<<7)|(ch<<3)]); }
+// Safari's AAC encoder writes a broken decoder setup (WebKit bug 302253), which leaves the sound silent in the saved file.
+// Write a correct one, and take off any ADTS header in case the frames come wrapped.
+function fixAacChunk(c,meta,sr,ch){
+  const d=new Uint8Array(c.byteLength); c.copyTo(d); let data=d;
+  if(d.length>7 && d[0]===0xFF && (d[1]&0xF6)===0xF0){ const L=((d[3]&3)<<11)|(d[4]<<3)|(d[5]>>5), hl=(d[1]&1)?7:9; if(L===d.length && L>hl) data=d.subarray(hl); }
+  const m={...(meta||{}), decoderConfig:{...((meta&&meta.decoderConfig)||{}),codec:'mp4a.40.2',sampleRate:sr,numberOfChannels:ch,description:aacConfig(sr,ch)}};
+  return {data,meta:m};
 }
 async function clipSound(ac,m,from,to){
   // a video's own sound: read just the stretch that's used (whole-file decoding would run a phone out of memory)
   if(m.kind==='video'){
     const s=await aacSlice(m,from,to).catch(()=>null);
-    if(s){ const ab=await decodeAudio(ac,s.buf).catch(()=>null); if(ab){
+    if(s){ let ab=await decodeAudio(ac,s.buf).catch(()=>null);
+      if(!ab){ try{ ab=await decodeAudio(ac,aacToM4a(s)); }catch(e){ ab=null; } }
+      if(ab){
       // some decoders drop the encoder's 2112-sample start-up delay, some don't: measure which, so lips stay in sync
       const expect=s.frames*1024*ac.sampleRate/s.sr, trimmed=Math.abs(ab.length-(expect-2112*ac.sampleRate/s.sr))<Math.abs(ab.length-expect);
       return {ab, t0:s.t0+(trimmed?2112/s.sr:0)}; } }
@@ -2399,10 +2439,10 @@ async function renderMix(tot,onProg){
   const sr=48000, OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; if(!OAC) return null;
   const ac=new OAC(2,Math.max(1,Math.ceil(tot*sr)),sr); let any=false;
   const curve=(g,t0,d,from,to)=>{ const N=24, arr=new Float32Array(N); for(let i=0;i<N;i++){ const e=ease(i/(N-1)); arr[i]=from+(to-from)*e; } try{ g.gain.setValueCurveAtTime(arr,t0,Math.max(.01,d)); }catch(e){} };
-  const songs=new Map(), jobs=P.audio.length+P.clips.length; let done=0;
+  const songs=new Map(), jobs=P.audio.length+P.clips.length; let done=0; const missing=new Set();
   for(const a of P.audio){ const m=media[a.mediaId]; done++; if(!m||!m.blob||!(a.volume>0)) continue;
     let s=songs.get(m.id); if(!s){ s=await decodeAudio(ac,await m.blob.arrayBuffer()).catch(()=>null); songs.set(m.id,s); }
-    if(!s) continue; const d=a.out-a.in, src=ac.createBufferSource(), g=ac.createGain(); src.buffer=s; src.connect(g); g.connect(ac.destination);
+    if(!s){ missing.add(m.name); continue; } const d=a.out-a.in, src=ac.createBufferSource(), g=ac.createGain(); src.buffer=s; src.connect(g); g.connect(ac.destination);
     const v=a.volume, fi=Math.min(a.fadeIn||0,d/2), fo=Math.min(a.fadeOut||0,d/2);
     g.gain.setValueAtTime(fi>0?0:v,a.start); if(fi>0) g.gain.linearRampToValueAtTime(v,a.start+fi);
     if(fo>0){ g.gain.setValueAtTime(v,a.start+d-fo); g.gain.linearRampToValueAtTime(0,a.start+d); }
@@ -2412,16 +2452,16 @@ async function renderMix(tot,onProg){
     const dIn=i>0?trDur(cs[i-1],c):0, dOut=i<cs.length-1?trDur(c,cs[i+1]):0;
     let t0=c._s-dIn/2; const t1=c._s+c._d+dOut/2; let off=c.in+(t0-c._s)*c.speed; if(off<0){ t0-=off/c.speed; off=0; }
     const endSrc=Math.min(m.dur,c.in+(t1-c._s)*c.speed); if(endSrc<=off) continue;
-    const snd=await clipSound(ac,m,off,endSrc); if(!snd) continue;
+    const snd=await clipSound(ac,m,off,endSrc); if(!snd){ const pm=await parseMp4(m.blob).catch(()=>null); if(!pm||pm.audio||m.blob.size<=(isIOS?60e6:200e6)) missing.add(m.name); continue; }   // (a video with no sound track at all isn't missing anything)
     const src=ac.createBufferSource(), g=ac.createGain(); src.buffer=snd.ab; src.playbackRate.value=c.speed; src.connect(g); g.connect(ac.destination);
     const v=c.volume; g.gain.setValueAtTime(dIn>0?0:v,Math.max(0,t0));
     if(dIn>0) curve(g,Math.max(0,c._s-dIn/2),dIn,0,v);
     if(dOut>0){ g.gain.setValueAtTime(v,c._s+c._d-dOut/2); curve(g,c._s+c._d-dOut/2,dOut,v,0); }
     const bo=Math.max(0,off-snd.t0), len=(endSrc-off);
     src.start(Math.max(0,t0),bo,len); any=true; }
-  if(!any) return null;
+  if(!any) return {buf:null,missing:[...missing]};
   const out=await new Promise((res,rej)=>{ ac.oncomplete=e=>res(e.renderedBuffer); const p=ac.startRendering(); if(p&&p.then) p.then(res,rej); });
-  return out;
+  return {buf:out,missing:[...missing]};
 }
 // H.264 first (plays everywhere, and it's what iPhones encode in hardware); VP9 only for browsers without H.264
 const canPlayMp4=c=>{ try{ const v=document.createElement('video'); return !!v.canPlayType(`video/mp4; codecs="${c}"`); }catch(e){ return false; } };
@@ -2473,14 +2513,16 @@ async function exportExact(k){
   try{
     for(const c of P.clips){ const m=media[c.mediaId]; if(m&&m.kind==='video') await checkRotation(m); }
     // 1. sound
-    let mix=null; if(snd){ mix=await renderMix(tot,f=>prog(f*.08,'Mixing the sound')); }
+    let mix=null, missing=[]; if(snd){ const r=await renderMix(tot,f=>prog(f*.08,'Mixing the sound')); mix=r&&r.buf; missing=(r&&r.missing)||[];
+      if(!mix && missing.length) throw new Error('nosound'); }   // never save a silent video when there should be sound
     if(ex.cancel) throw new Error('cancel');
     const target=new Mp4Muxer.ArrayBufferTarget();
     const muxer=new Mp4Muxer.Muxer({target,video:{codec:vc.mux,width:w,height:h,frameRate:FPS},audio:mix?{codec:ac.mux,numberOfChannels:2,sampleRate:48000}:undefined,fastStart:'in-memory',firstTimestampBehavior:'offset'});
     if(mix){
-      aenc=new AudioEncoder({output:(c,m)=>muxer.addAudioChunk(c,m),error:e=>{ fail=e; }}); aenc.configure(ac.cfg);
-      const L=mix.getChannelData(0), R=mix.getChannelData(1), step=4096;
-      for(let i=0;i<mix.length;i+=step){ const n=Math.min(step,mix.length-i), d=new Float32Array(n*2); d.set(L.subarray(i,i+n),0); d.set(R.subarray(i,i+n),n);
+      aenc=new AudioEncoder({output:(c,m)=>{ if(ac.mux==='aac'){ const f=fixAacChunk(c,m,48000,2); muxer.addAudioChunkRaw(f.data,c.type,c.timestamp,c.duration,f.meta); } else muxer.addAudioChunk(c,m); },error:e=>{ fail=e; }}); aenc.configure(ac.cfg);
+      const skip=ac.mux==='aac'?await measureAacDelay(ac.cfg):0;
+      const L=mix.getChannelData(0).subarray(skip), R=mix.getChannelData(1).subarray(skip), step=4096, len=L.length;
+      for(let i=0;i<len;i+=step){ const n=Math.min(step,len-i), d=new Float32Array(n*2); d.set(L.subarray(i,i+n),0); d.set(R.subarray(i,i+n),n);
         const ad=new AudioData({format:'f32-planar',sampleRate:48000,numberOfFrames:n,numberOfChannels:2,timestamp:Math.round(i/48000*1e6),data:d}); aenc.encode(ad); ad.close();
         if(aenc.encodeQueueSize>16) await new Promise(r=>setTimeout(r,0)); }
       await aenc.flush(); if(fail) throw fail;
@@ -2516,12 +2558,13 @@ async function exportExact(k){
     frameOv.clear(); for(const r of readers.values()) try{ r.close(); }catch(e){}
     try{ venc.close(); }catch(e){} try{ aenc&&aenc.close(); }catch(e){}
     exporting=null; applyAspect(false); dirty=true; if(lock) try{ lock.release(); }catch(e){}
-    showExportResult(new Blob([target.buffer],{type:'video/mp4'}),'mp4');
+    showExportResult(new Blob([target.buffer],{type:'video/mp4'}),'mp4', missing.length?`Sound from ${missing.slice(0,3).map(n=>'\u201c'+n+'\u201d').join(', ')}${missing.length>3?' and others':''} couldn\u2019t be read, so ${missing.length>1?'they\u2019re':'it\u2019s'} silent in this export.`:'');
   }catch(e){
     frameOv.clear(); for(const r of readers.values()) try{ r.close(); }catch(_){}
     try{ venc&&venc.close(); }catch(_){} try{ aenc&&aenc.close(); }catch(_){}
     exporting=null; applyAspect(false); dirty=true; if(lock) try{ lock.release(); }catch(_){}
     if(e&&e.message==='cancel'){ $('#exportModal').hidden=true; toast('Export cancelled'); return true; }
+    if(e&&e.message==='nosound'){ toast('Sound couldn\u2019t be prepared for frame-by-frame export, so this one records in real time'); return false; }
     console.warn('exact export',e);
     $('#exBody').innerHTML=`<p class="note" style="margin:0">The export stopped part-way (${esc(String(e&&e.message||e)).slice(0,120)}).</p><div class="mfoot"><button class="btn ghost" id="exCancel">Close</button><button class="btn primary" id="exLive">Export in real time instead</button></div>`;
     $('#exCancel').onclick=()=>{ $('#exportModal').hidden=true; }; $('#exLive').onclick=()=>startExport(k,pickMime(),true);
@@ -2582,12 +2625,12 @@ function onRecStop(){
   const type=ex.mime.split(';')[0], ext=type==='video/mp4'?'mp4':'webm';
   showExportResult(new Blob(chunks,{type}),ext);
 }
-function showExportResult(blob,ext){
+function showExportResult(blob,ext,note){
   if(window.__exURL) try{ URL.revokeObjectURL(window.__exURL); }catch(e){}
   lastBlob=blob; const url=window.__exURL=URL.createObjectURL(lastBlob);
   const name=(($('#projName').value||'Splice edit').replace(/[^\w\- ]+/g,'').trim()||'Splice edit')+'.'+ext;
   $('#exBody').innerHTML=`<div style="display:grid;gap:12px"><video id="outVid" src="${url}" controls playsinline></video>
-    <div class="stat">File<b>${esc(name)} · ${(lastBlob.size/1048576).toFixed(1)} MB</b></div>
+    <div class="stat">File<b>${esc(name)} · ${(lastBlob.size/1048576).toFixed(1)} MB</b></div>${note?`<p class="note" style="margin:0">${esc(note)}</p>`:''}
     <div class="mfoot"><button class="btn ghost" id="exDone">Close</button><button class="btn primary" id="exSave">${ICON.upload}Save video</button></div></div>`;
   $('#exDone').onclick=()=>{ $('#exportModal').hidden=true; };
   $('#exSave').onclick=()=>saveBlob(lastBlob,name);
