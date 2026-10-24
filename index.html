@@ -836,7 +836,9 @@ function syncMedia(){
       setGain(r,g);
       if(el.paused){ if(Math.abs(el.currentTime-tgt)>0.08) el.currentTime=tgt; el.playbackRate=1; el.play().catch(playErr); }
       else { if(el.playbackRate!==1) el.playbackRate=1;                           // music is never sped up or slowed (that's what sounds wobbly)
-        if(a.id!==masterAudio && Math.abs(el.currentTime-tgt)>.6 && !el.seeking) el.currentTime=tgt; }   // only a big drift is corrected
+        if(a.id!==masterAudio && Math.abs(el.currentTime-tgt)>.6){
+          if(!el.seeking){ el.currentTime=tgt; r.seekAt=performance.now(); }
+          else if(performance.now()-(r.seekAt||0)>1000){ try{ el.pause(); el.currentTime=tgt; el.play().catch(playErr); }catch(e){} r.seekAt=performance.now(); } } }   // only a big drift is corrected; a seek that never finishes is tried again
     } else {
       setGain(r,0); if(!el.paused) el.pause();
       if(!el.seeking && Math.abs(el.currentTime-tgt)>0.05) el.currentTime=tgt;
@@ -1082,7 +1084,7 @@ new ResizeObserver(()=>{fitCanvas(); if(!drag) renderTL();}).observe($('#viewer'
 /* ---------------- playback ---------------- */
 function setPlaying(v){
   playing=v; $('#playIco').innerHTML=v?ICON.pause:ICON.play; $('#playBtn').setAttribute('aria-label',v?'Pause':'Play');
-  if(v){ playT0=T; playW0=performance.now(); }
+  if(v){ playT0=T; playW0=performance.now(); resyncAudio(); }
   syncMedia();
 }
 function unlockVideos(){
@@ -1095,7 +1097,11 @@ function togglePlay(){ ensureAudio(); if(!playing) unlockVideos(); if(playing&&l
 function seek(t){ T=clamp(t,0,total()); if(playing){ playT0=T; playW0=performance.now(); resyncAudio(); } dirty=true; syncMedia(); }
 // after a jump, put every song at the new spot straight away, and let the picture keep time until they've landed
 let audioGrace=0;
-function resyncAudio(){ audioGrace=performance.now()+400;
+function putSongBack(am,t,now){ const r=am.r, el=r.el; if(now-(r.fixAt||0)<350) return; r.fixAt=now;
+  const want=am.a.in+(t-am.a.start);
+  try{ if(r.fixes>2){ el.pause(); el.currentTime=want; el.play().catch(playErr); r.fixes=0; } else { el.currentTime=want; r.fixes=(r.fixes||0)+1; } }catch(e){} }
+let playFrom=0;
+function resyncAudio(){ audioGrace=performance.now()+400; playFrom=T;
   for(const a of P.audio){ const r=els.get(a.id); if(!r) continue; const local=T-a.start; if(local>=0 && local<a.out-a.in) try{ r.el.currentTime=a.in+local; }catch(e){} } }
 const fmtTC=t=>{ t=Math.max(0,t); const m=Math.floor(t/60), s=Math.floor(t%60), f=Math.floor((t%1)*FPS+1e-6); return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(f).padStart(2,'0')}`; };
 const fmtD=s=>s<60?`${s.toFixed(1)}s`:`${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}`;
@@ -1139,7 +1145,13 @@ function loop(now){
     // music is what people notice skipping, so when a song is playing it keeps time and the pictures follow it
     const am=now<audioGrace?null:audioMaster();
     const mc=am?null:pickMaster(), r=mc&&slotOf(mc.id);
-    if(am){ const lt=am.a.start+(am.r.el.currentTime-am.a.in); if(Math.abs(lt-t)<1.5){ t=Math.max(T,lt); masterAudio=am.a.id; } playT0=t; playW0=now; holdSince=0; }
+    if(am){ const lt=am.a.start+(am.r.el.currentTime-am.a.in);
+      // the song keeps time only while it's where it should be. If it's somewhere else (iPhone sometimes ignores moving
+      // a paused song, so it carries on from where it stopped), put the song back rather than dragging the playhead to it.
+      // (a song that's merely slow to start is waited for, as before)
+      if(lt>t+.25 || lt<playFrom-.25 || t-lt>1.5) putSongBack(am,t,now);
+      else { t=Math.max(T,lt); masterAudio=am.a.id; }
+      playT0=t; playW0=now; holdSince=0; }
     else if(r && !r.el.paused){
       if(r.el.seeking||r.el.readyState<3){ if(bridgeFrame(mc,t-mc._s)){ holdSince=0; } else { if(!holdSince) holdSince=now; if(now-holdSince<500) t=T; } }  // still loading: wait briefly rather than run ahead (unless the cut bridge has the frames)
       else { holdSince=0; const lt=(r.el.currentTime-mc.in)/mc.speed;
